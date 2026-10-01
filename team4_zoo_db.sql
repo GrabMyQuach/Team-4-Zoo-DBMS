@@ -818,4 +818,37 @@ CREATE TABLE `Maintenance` (
     ON DELETE SET NULL
     ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `Membership` (
+  `Membership_ID` int NOT NULL AUTO_INCREMENT,
+  `Customer_ID` int NOT NULL,
+  `MembershipType_ID` int NOT NULL,
+  `Start_Date` date NOT NULL,
+  `Expiration_Date` date NOT NULL,
+  `Status` varchar(20) NOT NULL,
+  PRIMARY KEY (`Membership_ID`),
+  CONSTRAINT `fk_membership_type`
+    FOREIGN KEY (`MembershipType_ID`)
+    REFERENCES `Membership_Type` (`MembershipType_ID`),
+  CONSTRAINT `chk_membership_dates`
+    CHECK (`Expiration_Date` >= `Start_Date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+CREATE TABLE `Membership_Type` (
+  `MembershipType_ID` int NOT NULL AUTO_INCREMENT,
+  `Membership_Name` varchar(50) NOT NULL,
+  `Price` decimal(10,2) NOT NULL,
+  `Benefits` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`MembershipType_ID`),
+  CONSTRAINT `chk_membership_price` CHECK (`Price` >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+INSERT INTO `Membership_Type`
+  (`Membership_Name`, `Price`, `Benefits`)
+VALUES
+  ('Tier 1 (Standard)', 50.00, 'Standard membership benefits'),
+  ('Tier 2 (Mid-Tier)', 100.00, 'Mid-tier membership benefits'),
+  ('Tier 3 (Premium)', 150.00, 'Premium membership benefits');
+
 -- Dump completed on 2026-09-30 12:12:23
