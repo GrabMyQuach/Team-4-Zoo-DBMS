@@ -646,4 +646,38 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
+DROP TABLE IF EXISTS `Animal_Employee`;
+CREATE TABLE `Animal_Employee` (
+  `Employee_ID` int NOT NULL,
+  `Animal_ID` int NOT NULL,
+  `Assigned_Role` varchar(100) DEFAULT NULL,
+  PRIMARY KEY (`Employee_ID`, `Animal_ID`),
+  KEY `Animal_ID` (`Animal_ID`),
+  CONSTRAINT `animal_employee_ibfk_1` FOREIGN KEY (`Employee_ID`) REFERENCES `Employee` (`Employee_ID`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `animal_employee_ibfk_2` FOREIGN KEY (`Animal_ID`) REFERENCES `Animal` (`Animal_ID`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Species Feed Table
+DROP TABLE IF EXISTS `Species_Feed`;
+CREATE TABLE `Species_Feed` (
+  `Species_ID` int NOT NULL,
+  `Feed_ID` int NOT NULL,
+  `Daily_Quantity` decimal(10,2) DEFAULT NULL,
+  PRIMARY KEY (`Species_ID`, `Feed_ID`),
+  KEY `Feed_ID` (`Feed_ID`),
+  CONSTRAINT `species_feed_ibfk_1` FOREIGN KEY (`Species_ID`) REFERENCES `Species` (`Species_ID`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `species_feed_ibfk_2` FOREIGN KEY (`Feed_ID`) REFERENCES `Feed` (`Feed_ID`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Attraction Access per Ticket Type
+DROP TABLE IF EXISTS `Ticket_Attraction`;
+CREATE TABLE `Ticket_Attraction` (
+  `TicketType_ID` int NOT NULL,
+  `Attraction_ID` int NOT NULL,
+  PRIMARY KEY (`TicketType_ID`, `Attraction_ID`),
+  KEY `Attraction_ID` (`Attraction_ID`),
+  CONSTRAINT `ticket_attraction_ibfk_1` FOREIGN KEY (`TicketType_ID`) REFERENCES `Ticket_Type` (`TicketType_ID`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `ticket_attraction_ibfk_2` FOREIGN KEY (`Attraction_ID`) REFERENCES `Attraction` (`Attraction_ID`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 -- Dump completed on 2026-09-30 12:12:23
