@@ -492,6 +492,37 @@ LOCK TABLES `Supplier` WRITE;
 /*!40000 ALTER TABLE `Supplier` ENABLE KEYS */;
 UNLOCK TABLES;
 
+
+--
+-- Table structure for table `Feed`
+--
+
+DROP TABLE IF EXISTS `Feed`;
+/*!40101 SET @saved_cs_client      = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `Feed` (
+  `Feed_ID` int NOT NULL AUTO_INCREMENT,
+  `Feed_Name` varchar(100) NOT NULL,
+  `Feed_Type` varchar(50) DEFAULT NULL,
+  `Supplier_ID` int DEFAULT NULL,
+  `Quantity_In_Stock` decimal(10,2) DEFAULT NULL,
+  `Storage_Location` varchar(100) DEFAULT NULL,
+  `Expiration_Date` date DEFAULT NULL,
+  PRIMARY KEY (`Feed_ID`),
+  KEY `Supplier_ID` (`Supplier_ID`),
+  CONSTRAINT `feed_ibfk_1` FOREIGN KEY (`Supplier_ID`) REFERENCES `Supplier` (`Supplier_ID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `Feed`
+--
+
+LOCK TABLES `Feed` WRITE;
+/*!40000 ALTER TABLE `Feed` DISABLE KEYS */;
+/*!40000 ALTER TABLE `Feed` ENABLE KEYS */;
+UNLOCK TABLES;
+
 --
 -- Table structure for table `Supplier_Product`
 --
