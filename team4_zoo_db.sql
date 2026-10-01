@@ -679,5 +679,143 @@ CREATE TABLE `Ticket_Attraction` (
   CONSTRAINT `ticket_attraction_ibfk_1` FOREIGN KEY (`TicketType_ID`) REFERENCES `Ticket_Type` (`TicketType_ID`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `ticket_attraction_ibfk_2` FOREIGN KEY (`Attraction_ID`) REFERENCES `Attraction` (`Attraction_ID`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+--
+-- Table structure for table `Veterinarian`
+--
 
+DROP TABLE IF EXISTS `Veterinarian`;
+
+CREATE TABLE `Veterinarian` (
+  `Employee_ID` int NOT NULL,
+  `Specialization` varchar(100) DEFAULT NULL,
+  PRIMARY KEY (`Employee_ID`),
+  CONSTRAINT `veterinarian_ibfk_1`
+    FOREIGN KEY (`Employee_ID`)
+    REFERENCES `Employee` (`Employee_ID`)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+--
+-- Table structure for table `Keeper`
+--
+
+DROP TABLE IF EXISTS `Keeper`;
+
+CREATE TABLE `Keeper` (
+  `Employee_ID` int NOT NULL,
+  `Experience_Level` varchar(50) DEFAULT NULL,
+  PRIMARY KEY (`Employee_ID`),
+  CONSTRAINT `keeper_ibfk_1`
+    FOREIGN KEY (`Employee_ID`)
+    REFERENCES `Employee` (`Employee_ID`)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+--
+-- Table structure for table `Keeper_Enclosure`
+--
+
+DROP TABLE IF EXISTS `Keeper_Enclosure`;
+
+CREATE TABLE `Keeper_Enclosure` (
+  `Employee_ID` int NOT NULL,
+  `Enclosure_ID` int NOT NULL,
+  `Assignment_Start_Date` date DEFAULT NULL,
+  `Assignment_End_Date` date DEFAULT NULL,
+  PRIMARY KEY (`Employee_ID`,`Enclosure_ID`),
+  KEY `Enclosure_ID` (`Enclosure_ID`),
+  CONSTRAINT `keeper_enclosure_ibfk_1`
+    FOREIGN KEY (`Employee_ID`)
+    REFERENCES `Keeper` (`Employee_ID`)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+  CONSTRAINT `keeper_enclosure_ibfk_2`
+    FOREIGN KEY (`Enclosure_ID`)
+    REFERENCES `Enclosure` (`Enclosure_ID`)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+--
+-- Table structure for table `Volunteer`
+--
+
+DROP TABLE IF EXISTS `Volunteer`;
+
+CREATE TABLE `Volunteer` (
+  `Volunteer_ID` int NOT NULL AUTO_INCREMENT,
+  `First_Name` varchar(50) NOT NULL,
+  `Last_Name` varchar(50) NOT NULL,
+  `Phone_Number` varchar(20) DEFAULT NULL,
+  `Email` varchar(100) DEFAULT NULL,
+  `Start_Date` date DEFAULT NULL,
+  `End_Date` date DEFAULT NULL,
+  `Volunteer_Status` varchar(50) DEFAULT NULL,
+  `Department_ID` int DEFAULT NULL,
+  PRIMARY KEY (`Volunteer_ID`),
+  KEY `Department_ID` (`Department_ID`),
+  CONSTRAINT `volunteer_ibfk_1`
+    FOREIGN KEY (`Department_ID`)
+    REFERENCES `Department` (`Department_ID`)
+    ON DELETE SET NULL
+    ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
+--
+-- Table structure for table `Maintenance`
+--
+
+DROP TABLE IF EXISTS `Maintenance`;
+
+CREATE TABLE `Maintenance` (
+  `Maintenance_ID` int NOT NULL AUTO_INCREMENT,
+  `Description` varchar(255) DEFAULT NULL,
+  `Location` varchar(100) DEFAULT NULL,
+  `Request_Date` date DEFAULT NULL,
+  `Completion_Date` date DEFAULT NULL,
+  `Status` varchar(50) DEFAULT NULL,
+  `Cost` decimal(10,2) DEFAULT NULL,
+  `Employee_ID` int DEFAULT NULL,
+  `Enclosure_ID` int DEFAULT NULL,
+  `Attraction_ID` int DEFAULT NULL,
+  `Stand_ID` int DEFAULT NULL,
+  `GiftShop_ID` int DEFAULT NULL,
+  PRIMARY KEY (`Maintenance_ID`),
+  KEY `Employee_ID` (`Employee_ID`),
+  KEY `Enclosure_ID` (`Enclosure_ID`),
+  KEY `Attraction_ID` (`Attraction_ID`),
+  KEY `Stand_ID` (`Stand_ID`),
+  KEY `GiftShop_ID` (`GiftShop_ID`),
+  CONSTRAINT `maintenance_ibfk_1`
+    FOREIGN KEY (`Employee_ID`)
+    REFERENCES `Employee` (`Employee_ID`)
+    ON DELETE SET NULL
+    ON UPDATE CASCADE,
+  CONSTRAINT `maintenance_ibfk_2`
+    FOREIGN KEY (`Enclosure_ID`)
+    REFERENCES `Enclosure` (`Enclosure_ID`)
+    ON DELETE SET NULL
+    ON UPDATE CASCADE,
+  CONSTRAINT `maintenance_ibfk_3`
+    FOREIGN KEY (`Attraction_ID`)
+    REFERENCES `Attraction` (`Attraction_ID`)
+    ON DELETE SET NULL
+    ON UPDATE CASCADE,
+  CONSTRAINT `maintenance_ibfk_4`
+    FOREIGN KEY (`Stand_ID`)
+    REFERENCES `Food_Stand` (`Stand_ID`)
+    ON DELETE SET NULL
+    ON UPDATE CASCADE,
+  CONSTRAINT `maintenance_ibfk_5`
+    FOREIGN KEY (`GiftShop_ID`)
+    REFERENCES `Gift_Shop` (`GiftShop_ID`)
+    ON DELETE SET NULL
+    ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 -- Dump completed on 2026-09-30 12:12:23
