@@ -3,6 +3,54 @@
 @{
     ViewData["Title"] = "Privacy Policy";
 }
-<h1>@ViewData["Title"]</h1>
 
-<p>Use this page to detail your site's privacy policy.</p>
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="mb-0 brand-title">Privacy Policy</h1>
+    <p class="text-muted mb-0 mt-1">Last updated: October 2026</p>
+</div>
+
+<div class="card" style="max-width: 860px;">
+    <div class="card-body p-4 privacy">
+
+        <h2 class="h5">Who this system is for</h2>
+        <p>ZooDatabase is an internal system for authorized zoo staff. Zoo visitors and customers do not log in.</p>
+
+        <h2 class="h5">What information we store</h2>
+        <ul>
+            <li><strong>Staff information:</strong> names, contact details, job positions, and departments.</li>
+            <li><strong>Customer information:</strong> names, email addresses, and phone numbers connected to ticket sales and memberships.</li>
+            <li><strong>Operations records:</strong> animals, enclosures, sales, inventory, and maintenance.</li>
+            <li><strong>Login accounts:</strong> usernames, roles, and login times.</li>
+        </ul>
+
+        <h2 class="h5">How we use it</h2>
+        <p>Information is only used to run the zoo's daily operations, such as caring for animals, managing staff, recording sales, and creating reports.</p>
+
+        <h2 class="h5">Who can see it</h2>
+        <p>Access depends on each user's role:</p>
+        <ul>
+            <li><strong>ReadOnly:</strong> can view information but cannot change it.</li>
+            <li><strong>Admin:</strong> can view, add, and edit day-to-day records.</li>
+            <li><strong>SuperUser:</strong> can also delete records and view reports.</li>
+            <li><strong>DBA:</strong> has full access, including managing user accounts.</li>
+        </ul>
+
+        <h2 class="h5">How we protect it</h2>
+        <ul>
+            <li>Passwords are never stored. Only a secure, scrambled version (a hash) is saved.</li>
+            <li>The connection to the database is encrypted.</li>
+            <li>Every page requires login, and sensitive pages are restricted by role.</li>
+            <li>Accounts can be deactivated when a staff member leaves.</li>
+        </ul>
+
+        <h2 class="h5">Cookies</h2>
+        <p>We use one cookie to keep you logged in. It expires after 8 hours or when you log out. We do not use advertising or tracking cookies.</p>
+
+        <h2 class="h5">Questions</h2>
+        <p>For privacy questions, contact the zoo's system administrator (DBA).</p>
+
+        <p class="text-muted small border-top pt-3 mb-0">
+            This is a sample policy written for a university class project (COSC 3380, Team 4). It is not a legal document.
+        </p>
+    </div>
+</div>

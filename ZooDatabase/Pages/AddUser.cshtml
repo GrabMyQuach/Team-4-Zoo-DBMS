@@ -1,0 +1,52 @@
+@page
+@model AddUserModel
+@{
+    ViewData["Title"] = "Add User";
+}
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">Add User</h1>
+</div>
+
+<div class="card" style="max-width: 560px;">
+    <div class="card-body p-4">
+
+        @if (Model.ErrorMessage != null)
+        {
+            <div class="alert alert-danger py-2">@Model.ErrorMessage</div>
+        }
+
+        <form method="post">
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Username</label>
+                <input asp-for="Username" class="form-control" placeholder="e.g. jsmith" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Role</label>
+                <select asp-for="Role" class="form-select">
+                    @foreach (var r in AddUserModel.Roles)
+                    {
+                        <option value="@r">@r</option>
+                    }
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Password</label>
+                <input asp-for="Password" type="password" class="form-control" />
+                <div class="form-text">At least 8 characters.</div>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label fw-semibold">Confirm Password</label>
+                <input asp-for="ConfirmPassword" type="password" class="form-control" />
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary rounded-pill px-4">Create User</button>
+                <a asp-page="/ManageUsers" class="btn btn-outline-secondary rounded-pill px-4">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>

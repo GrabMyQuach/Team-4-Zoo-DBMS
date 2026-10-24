@@ -56,3 +56,105 @@ body {
     border-color: #e3e7e5;
     overflow: hidden;
 }
+.btn-outline-primary {
+    color: #1f5f3f;
+    border-color: #1f5f3f;
+}
+.btn-outline-primary:hover {
+    background-color: #1f5f3f;
+    border-color: #1f5f3f;
+    color: #fff;
+}
+/* ===== Home page cards (like CPOMS product cards) ===== */
+.module-card {
+    display: block;
+    height: 100%;
+    background: #fff;
+    border: 1px solid #e3e7e5;
+    border-radius: 16px;
+    padding: 32px 24px;
+    text-align: center;
+    text-decoration: none;
+    color: inherit;
+    transition: transform .15s, box-shadow .15s;
+}
+.module-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0,0,0,.08);
+    color: inherit;
+}
+.module-card-icon { font-size: 56px; line-height: 1; }
+.module-card-title { font-size: 1.25rem; font-weight: 700; color: #1f5f3f; margin-top: 16px; }
+.module-card-desc { font-size: .9rem; color: #6c757d; margin-top: 8px; }
+.module-card-img {
+    width: 100%;
+    height: 140px;
+    object-fit: contain;
+}
+/* ===== Section sidebar (like CPOMS) ===== */
+.module-sidebar {
+    background: #fff;
+    border: 1px solid #e3e7e5;
+    border-radius: 12px;
+    padding: 16px;
+}
+.module-title {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: #1f5f3f;
+    margin-bottom: 12px;
+}
+.module-sidebar .nav-link {
+    color: #333;
+    border-radius: 8px;
+    padding: 8px 12px;
+}
+.module-sidebar .nav-link:hover {
+    background: #eef3f0;
+}
+.module-sidebar .nav-link.active {
+    background: #1f5f3f;
+    color: #fff;
+}
+.back-link {
+    display: block;
+    margin-top: 16px;
+    color: #1f5f3f;
+    text-decoration: none;
+    font-size: .9rem;
+}
+/* ===== Bigger top bar ===== */
+header .navbar {
+    padding-top: 16px;
+    padding-bottom: 16px;
+}
+header .navbar-brand {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #1f5f3f !important;
+}
+header .nav-link,
+header .navbar-text {
+    font-size: 1.1rem;
+}
+header .nav-link {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+}
+header .btn {
+    font-size: 1rem;
+    padding: 6px 20px;
+    border-radius: 999px;
+}
+.brand-title {
+    color: #1f5f3f;
+    font-weight: 700;
+}
+.privacy h2 {
+    color: #1f5f3f;
+    font-weight: 700;
+    margin-top: 24px;
+}
+.privacy h2:first-child {
+    margin-top: 0;
+}

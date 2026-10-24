@@ -1,11 +1,23 @@
 ﻿@page
 @model IndexModel
+@using ZooDatabase.Data
 @{
-    ViewData["Title"] = "Home page";
+    ViewData["Title"] = "Home";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p><strong>@Model.Message</strong></p>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="mb-0 brand-title">ZooDatabase</h1>
+    <p class="text-muted mb-0 mt-1">Choose a section to get started.</p>
+</div>
+
+<div class="row g-4">
+    @foreach (var m in ZooModules.All)
+    {
+        <div class="col-sm-6 col-lg-3">
+            <a href="/@m.Key" class="module-card">
+                <img src="/images/@m.Image" alt="@m.Title" class="module-card-img" />
+                <div class="module-card-title">@m.Title</div>
+            </a>
+        </div>
+    }
 </div>

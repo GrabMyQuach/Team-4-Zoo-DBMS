@@ -13,7 +13,9 @@
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
             <div class="container">
-                <a class="navbar-brand" asp-area="" asp-page="/Index">ZooDatabase</a>
+                <a class="navbar-brand" asp-area="" asp-page="/Index">
+    <img src="/images/zoo-logo.jpg" alt="ZooDatabase" style="height: 60px;" />
+</a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                         aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
@@ -35,10 +37,10 @@
                     </ul>
                     @if (User.Identity?.IsAuthenticated == true)
 {
-    <span class="navbar-text me-3">
-        👤 @User.Identity.Name
-        <span class="badge bg-success ms-1">@User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value</span>
-    </span>
+    <a asp-page="/MyAccount" class="navbar-text me-3 text-decoration-none text-dark">
+    👤 @User.Identity.Name
+    <span class="badge bg-success ms-1">@User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value</span>
+</a>
     <form method="post" asp-page="/Logout" class="d-inline">
         <button type="submit" class="btn btn-outline-secondary btn-sm">Log out</button>
     </form>
