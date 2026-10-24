@@ -29,3 +29,30 @@ body {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
   text-align: start;
 }
+/* ===== Zoo theme (matches the login page) ===== */
+body {
+    background-color: #f4f6f5;
+}
+
+/* Green buttons */
+.btn-primary {
+    background-color: #1f5f3f;
+    border-color: #1f5f3f;
+}
+.btn-primary:hover,
+.btn-primary:focus {
+    background-color: #174a31;
+    border-color: #174a31;
+}
+
+/* Green role badges */
+.badge.bg-success {
+    background-color: #1f5f3f !important;
+}
+
+/* Softer, rounder cards and tables */
+.card {
+    border-radius: 12px;
+    border-color: #e3e7e5;
+    overflow: hidden;
+}

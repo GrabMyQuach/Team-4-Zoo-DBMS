@@ -26,7 +26,23 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-page="/Privacy">Privacy</a>
                         </li>
+                        @if (User.IsInRole("DBA"))
+{
+    <li class="nav-item">
+        <a class="nav-link text-dark" asp-page="/ManageUsers">Manage Users</a>
+    </li>
+}
                     </ul>
+                    @if (User.Identity?.IsAuthenticated == true)
+{
+    <span class="navbar-text me-3">
+        👤 @User.Identity.Name
+        <span class="badge bg-success ms-1">@User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value</span>
+    </span>
+    <form method="post" asp-page="/Logout" class="d-inline">
+        <button type="submit" class="btn btn-outline-secondary btn-sm">Log out</button>
+    </form>
+}
                 </div>
             </div>
         </nav>
