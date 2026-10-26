@@ -1,0 +1,185 @@
+
+@page
+@model ZooDatabase.Pages.Staff.EmployeeManageModel
+
+@{
+    ViewData["Title"] = "Employee Management";
+}
+
+<div class="container mt-4">
+
+    <h1>Employee Management</h1>
+    
+    @if (!string.IsNullOrEmpty(Model.SuccessMessage))
+    {
+        <div class="alert alert-success">
+            @Model.SuccessMessage
+        </div>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+       <div class="alert alert-danger">
+           @TempData["ErrorMessage"]
+       </div>
+    }
+
+    <h3>Add New Employee</h3>
+
+    <form method="post">
+        
+        <div class="mb-3">
+           <label class="form-label">SSN</label>
+           <input type="text"
+           name="SSN"
+           class="form-control"
+           maxlength="9"
+           minlength="9"
+           pattern="[0-9]{9}"
+           placeholder="9-digit fictional SSN" />
+        </div>
+
+
+        <div class="mb-3">
+            <label class="form-label">First Name</label>
+            <input type="text" name="FirstName"
+                   class="form-control" maxlength="50" required />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Middle Name</label>
+            <input type="text" name="MiddleName"
+                   class="form-control" maxlength="50" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Last Name</label>
+            <input type="text" name="LastName"
+                   class="form-control" maxlength="50" required />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Address</label>
+            <input type="text" name="Address"
+                   class="form-control" maxlength="255" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Gender</label>
+            <select name="Gender" class="form-select">
+                <option value="">Select Gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Phone Number</label>
+            <input type="tel" name="PhoneNumber"
+                   class="form-control" maxlength="20" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Job Position</label>
+            <input type="text" name="JobPosition"
+                   class="form-control" maxlength="100" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Hire Date</label>
+            <input type="date" name="HireDate"
+                   class="form-control" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Department ID</label>
+            <input type="number" name="DepartmentId"
+                   class="form-control" min="1" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Employment Type</label>
+            <input type="text" name="EmploymentType"
+                   class="form-control" maxlength="50" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Pay Type</label>
+            <input type="text" name="PayType"
+                   class="form-control" maxlength="50" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Pay Rate</label>
+            <input type="number" name="PayRate"
+                   class="form-control" min="0" step="0.01" />
+        </div>
+
+        <button type="submit" class="btn btn-success">
+            Add Employee
+        </button>
+
+    </form>
+    
+<hr class="my-4" />
+
+<h3>Existing Employees</h3>
+
+<table class="table table-bordered table-striped">
+    <thead>
+        <tr>
+            <th>Employee ID</th>
+            <th>SSN</th>
+            <th>First Name</th>
+            <th>Last Name</th>
+            <th>Job Position</th>
+            <th>Department ID</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+
+    <tbody>
+        @foreach (var employee in Model.Employees)
+        {
+            <tr>
+                <td>@employee.EmployeeId</td>
+                <td>@employee.SSN</td>
+                <td>@employee.FirstName</td>
+                <td>@employee.LastName</td>
+                <td>@employee.JobPosition</td>
+                <td>@employee.DepartmentId</td>
+                
+                <td>
+                   <a asp-page="./EmployeeEdit"
+                      asp-route-id="@employee.EmployeeId"
+                      class="btn btn-primary btn-sm">
+                      Edit
+                   </a>
+                   
+                  <form method="post"
+                      asp-page-handler="Delete"
+                      asp-route-id="@employee.EmployeeId"
+                      class="d-inline"
+                      onsubmit="return confirm('Are you sure you want to permanently delete this employee?');">
+
+                  <button type="submit"
+                      class="btn btn-danger btn-sm">
+                      Delete
+                  </button>
+                  </form>
+
+                </td>
+
+            </tr>
+        }
+    </tbody>
+</table>
+
+@if (Model.Employees.Count == 0)
+{
+    <p>No employees found in the database.</p>
+}
+
+
+</div>

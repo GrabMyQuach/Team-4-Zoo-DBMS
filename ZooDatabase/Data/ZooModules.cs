@@ -12,21 +12,23 @@ public static class ZooModules
         new("Animals", "Animals", "🦁","card-animals.png", "Animals, species, enclosures, and feeding", new ModuleSection[]
         {
             new("Animals", "Animals"),
+            new("Manage Animals", "Manage"),
             new("Species", "Species"),
             new("Enclosures", "Enclosures"),
             new("Feed", "Feed"),
-            new("Reports", "Reports")
+            new("Reports", "animalreports")
         }),
 
         new("Staff", "Staff & Operations", "👷","card-staff.png", "Employees, departments, and maintenance", new ModuleSection[]
         {
             new("Employees", "Employees"),
+            new("Manage Employees", "EmployeeManage"),
             new("Departments", "Departments"),
             new("Keepers", "Keepers"),
             new("Veterinarians", "Veterinarians"),
             new("Volunteers", "Volunteers"),
             new("Maintenance", "Maintenance"),
-            new("Reports", "Reports")
+            new("Reports", "employeereports")
         }),
 
         new("Tickets", "Tickets & Memberships", "🎟️","card-tickets.webp", "Ticket sales, customers, and attractions", new ModuleSection[]

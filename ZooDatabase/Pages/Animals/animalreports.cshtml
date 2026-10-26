@@ -1,0 +1,54 @@
+
+@page
+@model ZooDatabase.Pages.Animals.AnimalReportModel
+
+@{
+    ViewData["Title"] = "Animal Report";
+}
+
+<div class="container mt-4">
+
+    <h1>Animal Report</h1>
+
+    <p>
+        This report displays animal information
+        along with species and health status.
+    </p>
+
+    <hr />
+
+    <h3>Animal Records</h3>
+
+    <table class="table table-bordered table-striped">
+        <thead>
+            <tr>
+                <th>Animal ID</th>
+                <th>Animal Name</th>
+                <th>Species</th>
+                <th>Gender</th>
+                <th>Health Status</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            @foreach (var animal in Model.Animals)
+            {
+                <tr>
+                    <td>@animal.AnimalId</td>
+                    <td>@animal.AnimalName</td>
+                    <td>@animal.Species</td>
+                    <td>@animal.Gender</td>
+                    <td>@animal.HealthStatus</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    @if (Model.Animals.Count == 0)
+    {
+        <div class="alert alert-info">
+            No animal records found.
+        </div>
+    }
+
+</div>
