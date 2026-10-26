@@ -1,0 +1,68 @@
+@page
+@model ZooDatabase.Pages.Staff.MaintenanceModel
+@{
+    ViewData["Title"] = "Maintenance";
+}
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">Maintenance</h1>
+</div>
+
+<div class="d-flex gap-2 mb-3">
+    <a href="/Staff/Maintenance?Show=open"
+       class="btn rounded-pill px-4 @(Model.Show != "all" ? "btn-primary" : "btn-outline-secondary")">Open requests</a>
+    <a href="/Staff/Maintenance?Show=all"
+       class="btn rounded-pill px-4 @(Model.Show == "all" ? "btn-primary" : "btn-outline-secondary")">All requests</a>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>#</th>
+                    <th>Request</th>
+                    <th>Where</th>
+                    <th>Assigned To</th>
+                    <th>Requested</th>
+                    <th>Status</th>
+                    <th class="text-end">Cost</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var m in Model.Rows)
+                {
+                    <tr>
+                        <td>@m.Id</td>
+                        <td>@m.Description</td>
+                        <td>@m.Place</td>
+                        <td>@(m.AssignedTo ?? "Unassigned")</td>
+                        <td>@(m.RequestDate?.ToString("MMM d, yyyy") ?? "—")</td>
+                        <td>
+                            @if (m.Status == "Completed")
+                            {
+                                <span class="badge bg-success">Completed</span>
+                                if (m.CompletionDate != null)
+                                {
+                                    <div class="small text-muted">@m.CompletionDate.Value.ToString("MMM d, yyyy")</div>
+                                }
+                            }
+                            else
+                            {
+                                <span class="badge bg-warning text-dark">@(m.Status ?? "Open")</span>
+                            }
+                        </td>
+                        <td class="text-end">@(m.Cost?.ToString("C") ?? "—")</td>
+                    </tr>
+                }
+
+                @if (Model.Rows.Count == 0)
+                {
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">No maintenance requests found.</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

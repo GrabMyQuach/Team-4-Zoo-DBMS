@@ -26,7 +26,6 @@ public static class ZooModules
             new("Departments", "Departments"),
             new("Keepers", "Keepers"),
             new("Veterinarians", "Veterinarians"),
-            new("Volunteers", "Volunteers"),
             new("Maintenance", "Maintenance"),
             new("Reports", "employeereports")
         }),

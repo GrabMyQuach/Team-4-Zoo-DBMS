@@ -1,0 +1,47 @@
+@page
+@model ZooDatabase.Pages.Staff.KeepersModel
+@{
+    ViewData["Title"] = "Keepers";
+}
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">Keepers</h1>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Keeper</th>
+                    <th>Experience</th>
+                    <th>Current Enclosures</th>
+                    <th>Phone</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var k in Model.Rows)
+                {
+                    <tr>
+                        <td class="fw-semibold">@k.Name</td>
+                        <td>
+                            @if (k.ExperienceLevel != null)
+                            {
+                                <span class="badge bg-light text-dark border">@k.ExperienceLevel</span>
+                            }
+                        </td>
+                        <td>@(k.Enclosures ?? "Not assigned")</td>
+                        <td>@k.Phone</td>
+                    </tr>
+                }
+
+                @if (Model.Rows.Count == 0)
+                {
+                    <tr>
+                        <td colspan="4" class="text-center text-muted py-4">No keepers found.</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

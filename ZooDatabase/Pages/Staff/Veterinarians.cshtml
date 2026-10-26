@@ -1,0 +1,44 @@
+@page
+@model ZooDatabase.Pages.Staff.VeterinariansModel
+@{
+    ViewData["Title"] = "Veterinarians";
+}
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">Veterinarians</h1>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Veterinarian</th>
+                    <th>Specialization</th>
+                    <th>Phone</th>
+                    <th>Hired</th>
+                    <th class="text-end">Animals in Care</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var v in Model.Rows)
+                {
+                    <tr>
+                        <td class="fw-semibold">@v.Name</td>
+                        <td>@v.Specialization</td>
+                        <td>@v.Phone</td>
+                        <td>@(v.HireDate?.ToString("MMM d, yyyy") ?? "—")</td>
+                        <td class="text-end">@v.AnimalCount</td>
+                    </tr>
+                }
+
+                @if (Model.Rows.Count == 0)
+                {
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">No veterinarians found.</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

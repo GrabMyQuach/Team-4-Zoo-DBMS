@@ -1,0 +1,77 @@
+@page
+@model ZooDatabase.Pages.Tickets.CustomersModel
+@{
+    ViewData["Title"] = "Customers";
+    // ReadOnly users don't need customers' private contact info
+    bool showContact = !User.IsInRole("ReadOnly");
+}
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">Customers</h1>
+</div>
+
+<h2 class="h5 mb-3">@Model.Rows.Count customers</h2>
+
+<div class="card">
+    <div class="card-body border-bottom">
+        <form method="get" class="d-flex gap-2" style="max-width: 480px;">
+            <input type="text" name="Search" value="@Model.Search" class="form-control"
+                   placeholder="Search name or email" />
+            <button type="submit" class="btn btn-outline-secondary rounded-pill px-4">Search</button>
+        </form>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Customer</th>
+                    @if (showContact)
+                    {
+                        <th>Contact</th>
+                    }
+                    <th>Membership</th>
+                    <th class="text-end">Purchases</th>
+                    <th class="text-end">Total Spent</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var c in Model.Rows)
+                {
+                    <tr>
+                        <td class="fw-semibold">@c.Name</td>
+                        @if (showContact)
+                        {
+                            <td>
+                                @c.Email
+                                @if (c.Phone != null)
+                                {
+                                    <div class="small text-muted">@c.Phone</div>
+                                }
+                            </td>
+                        }
+                        <td>
+                            @if (c.Membership != null)
+                            {
+                                <span class="badge bg-success">@c.Membership</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">None</span>
+                            }
+                        </td>
+                        <td class="text-end">@c.Purchases</td>
+                        <td class="text-end">@c.TotalSpent.ToString("C")</td>
+                    </tr>
+                }
+
+                @if (Model.Rows.Count == 0)
+                {
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">No customers found.</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
