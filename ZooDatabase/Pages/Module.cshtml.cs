@@ -12,6 +12,8 @@ public class ModuleModel : PageModel
     {
         var m = ZooModules.Find(module);
         if (m == null) return NotFound();
+        // "/Animals" with no section → jump to the first sidebar item, like "/Animals/Animals"
+if (section == null) return Redirect($"/{m.Key}/{m.Sections[0].Slug}");
 
         var s = section == null
             ? m.Sections[0]

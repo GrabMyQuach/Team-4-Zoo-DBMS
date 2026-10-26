@@ -1,0 +1,55 @@
+@page
+@model ZooDatabase.Pages.Animals.SpeciesModel
+@{
+    ViewData["Title"] = "Species";
+}
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">Species</h1>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Species</th>
+                    <th>Diet</th>
+                    <th>Habitat</th>
+                    <th>Conservation Status</th>
+                    <th class="text-end">Animals</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var s in Model.Rows)
+                {
+                    <tr>
+                        <td>
+                            <span class="fw-semibold">@s.CommonName</span>
+                            @if (s.ScientificName != null)
+                            {
+                                <div class="small text-muted fst-italic">@s.ScientificName</div>
+                            }
+                        </td>
+                        <td>@s.DietType</td>
+                        <td>@s.HabitatType</td>
+                        <td>
+                            @if (s.ConservationStatus != null)
+                            {
+                                <span class="badge bg-light text-dark border">@s.ConservationStatus</span>
+                            }
+                        </td>
+                        <td class="text-end">@s.AnimalCount</td>
+                    </tr>
+                }
+
+                @if (Model.Rows.Count == 0)
+                {
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">No species found.</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

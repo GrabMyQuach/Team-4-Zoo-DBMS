@@ -1,0 +1,71 @@
+@page
+@model ZooDatabase.Pages.Animals.FeedModel
+@{
+    ViewData["Title"] = "Feed";
+    var today = DateTime.Today;
+}
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">Feed</h1>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Feed</th>
+                    <th>Eaten By</th>
+                    <th>Supplier</th>
+                    <th>Storage</th>
+                    <th class="text-end">In Stock</th>
+                    <th>Expires</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var f in Model.Rows)
+                {
+                    <tr>
+                        <td>
+                            <span class="fw-semibold">@f.Name</span>
+                            @if (f.Type != null)
+                            {
+                                <div class="small text-muted">@f.Type</div>
+                            }
+                        </td>
+                        <td>@(f.EatenBy ?? "—")</td>
+                        <td>@(f.Supplier ?? "—")</td>
+                        <td>@f.StorageLocation</td>
+                        <td class="text-end">@f.QuantityInStock?.ToString("0.##")</td>
+                        <td>
+                            @if (f.ExpirationDate == null)
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                            else
+                            {
+                                var days = (f.ExpirationDate.Value - today).Days;
+                                @f.ExpirationDate.Value.ToString("MMM d, yyyy")
+                                if (days < 0)
+                                {
+                                    <span class="badge bg-danger ms-1">Expired</span>
+                                }
+                                else if (days <= 14)
+                                {
+                                    <span class="badge bg-warning text-dark ms-1">Expires soon</span>
+                                }
+                            }
+                        </td>
+                    </tr>
+                }
+
+                @if (Model.Rows.Count == 0)
+                {
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">No feed found.</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

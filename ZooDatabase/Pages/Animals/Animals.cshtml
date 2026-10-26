@@ -1,0 +1,77 @@
+@page
+@model ZooDatabase.Pages.Animals.AnimalsModel
+@{
+    ViewData["Title"] = "Animals";
+}
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">Animals</h1>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 mb-0">@Model.Animals.Count animals</h2>
+    @if (!User.IsInRole("ReadOnly"))
+    {
+        <a href="/Animals/Manage" class="btn btn-primary rounded-pill px-4">Manage Animals</a>
+    }
+</div>
+
+<div class="card">
+    <div class="card-body border-bottom">
+        <form method="get" class="d-flex gap-2" style="max-width: 480px;">
+            <input type="text" name="Search" value="@Model.Search" class="form-control"
+                   placeholder="Search name, species, or enclosure" />
+            <button type="submit" class="btn btn-outline-secondary rounded-pill px-4">Search</button>
+        </form>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Name</th>
+                    <th>Species</th>
+                    <th>Enclosure</th>
+                    <th>Gender</th>
+                    <th>Born</th>
+                    <th>Health</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var a in Model.Animals)
+                {
+                    <tr>
+                        <td class="fw-semibold">@a.Name</td>
+                        <td>
+                            @a.Species
+                            @if (a.ScientificName != null)
+                            {
+                                <div class="small text-muted fst-italic">@a.ScientificName</div>
+                            }
+                        </td>
+                        <td>@a.Enclosure</td>
+                        <td>@a.Gender</td>
+                        <td>@(a.DateOfBirth?.ToString("MMM d, yyyy") ?? "Unknown")</td>
+                        <td>
+                            @if (a.HealthStatus == "Healthy")
+                            {
+                                <span class="badge bg-success">Healthy</span>
+                            }
+                            else if (a.HealthStatus != null)
+                            {
+                                <span class="badge bg-warning text-dark">@a.HealthStatus</span>
+                            }
+                        </td>
+                    </tr>
+                }
+
+                @if (Model.Animals.Count == 0)
+                {
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">No animals found.</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
