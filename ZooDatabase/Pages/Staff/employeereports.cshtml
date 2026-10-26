@@ -1,0 +1,58 @@
+
+@page
+@model ZooDatabase.Pages.Staff.EmployeeReportModel
+
+@{
+    ViewData["Title"] = "Employee Report";
+}
+
+<div class="container mt-4">
+
+    <h1>Employee Report</h1>
+
+    <p>
+        This report displays employee information
+        along with their department and pay rate.
+    </p>
+
+    <hr />
+
+    <h3>Employee Records</h3>
+
+    <table class="table table-bordered table-striped">
+        <thead>
+            <tr>
+                <th>Employee ID</th>
+                <th>First Name</th>
+                <th>Last Name</th>
+                <th>Job Position</th>
+                <th>Department</th>
+                <th>Employment Type</th>
+                <th>Pay Rate</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            @foreach (var employee in Model.Employees)
+            {
+                <tr>
+                    <td>@employee.EmployeeId</td>
+                    <td>@employee.FirstName</td>
+                    <td>@employee.LastName</td>
+                    <td>@employee.JobPosition</td>
+                    <td>@employee.DepartmentName</td>
+                    <td>@employee.EmploymentType</td>
+                    <td>@employee.PayRate</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    @if (Model.Employees.Count == 0)
+    {
+        <div class="alert alert-info">
+            No employee records found.
+        </div>
+    }
+
+</div>

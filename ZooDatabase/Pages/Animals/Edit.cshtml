@@ -1,0 +1,84 @@
+
+@page
+@model ZooDatabase.Pages.Animals.EditModel
+
+@{
+    ViewData["Title"] = "Edit Animal";
+}
+
+<div class="container mt-4">
+
+    <h1>Edit Animal</h1>
+
+    <form method="post">
+
+        <input type="hidden" asp-for="Animal.AnimalId" />
+
+        <div asp-validation-summary="All"
+             class="text-danger"></div>
+
+        <div class="mb-3">
+            <label class="form-label">Animal Name</label>
+            <input asp-for="Animal.AnimalName"
+                   class="form-control" required />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Species ID</label>
+            <input asp-for="Animal.SpeciesId"
+                   type="number" class="form-control" required />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Enclosure ID</label>
+            <input asp-for="Animal.EnclosureId"
+                   type="number" class="form-control" required />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Gender</label>
+            <select asp-for="Animal.Gender" class="form-select">
+                <option value="">Select Gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Unknown">Unknown</option>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Date of Birth</label>
+            <input asp-for="Animal.DateOfBirth"
+                   type="date" asp-format="{0:yyyy-MM-dd}"
+                   class="form-control" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Health Status</label>
+            <input asp-for="Animal.HealthStatus"
+                   class="form-control" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Date Acquired</label>
+            <input asp-for="Animal.DateAcquired"
+                   type="date" asp-format="{0:yyyy-MM-dd}"
+                   class="form-control" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Acquisition Type</label>
+            <input asp-for="Animal.AcquisitionType"
+                   class="form-control" />
+        </div>
+
+        <button type="submit" class="btn btn-success">
+            Save Changes
+        </button>
+
+        <a asp-page="./Manage" class="btn btn-secondary">
+            Cancel
+        </a>
+
+    </form>
+
+</div>

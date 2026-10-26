@@ -6,6 +6,9 @@
     var module = ZooModules.Find(parts.ElementAtOrDefault(0));
     var currentSection = parts.ElementAtOrDefault(1) ?? module?.Sections[0].Slug;
     bool canSeeReports = User.IsInRole("SuperUser") || User.IsInRole("DBA");
+    bool canManageData = User.IsInRole("DBA") ||
+                     User.IsInRole("SuperUser") ||
+                     User.IsInRole("Admin");
 }
 
 <div class="row g-4">
@@ -18,6 +21,9 @@
                     foreach (var s in module.Sections)
                     {
                         if (s.Slug == "Reports" && !canSeeReports) { continue; }
+                        if (module.Key == "Animals" && s.Slug == "Manage" && !canManageData) { continue; }
+                        if (module.Key == "Staff" && s.Slug == "EmployeeManage" && !canManageData){ continue; }
+
 
                         var isActive = string.Equals(s.Slug, currentSection, StringComparison.OrdinalIgnoreCase);
                         <a class="nav-link @(isActive ? "active" : "")" href="/@module.Key/@s.Slug">@s.Title</a>
