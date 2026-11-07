@@ -1,0 +1,1346 @@
+create table Attraction
+(
+    Attraction_ID   int auto_increment
+        primary key,
+    Attraction_Name varchar(100)   not null,
+    Attraction_Type varchar(100)   null,
+    Location        varchar(100)   null,
+    Price           decimal(10, 2) null,
+    Status          varchar(50)    null
+);
+
+create table Customer
+(
+    Customer_ID  int auto_increment
+        primary key,
+    First_Name   varchar(50)  not null,
+    Last_Name    varchar(50)  not null,
+    Email        varchar(100) null,
+    Phone_Number varchar(20)  null,
+    constraint Email
+        unique (Email)
+);
+
+create table Department
+(
+    Department_ID   int auto_increment
+        primary key,
+    Department_Name varchar(100) not null,
+    Location        varchar(100) null,
+    Phone_Number    varchar(20)  null
+);
+
+create table Employee
+(
+    Employee_ID     int auto_increment
+        primary key,
+    SSN             char(9)        null,
+    First_Name      varchar(50)    not null,
+    Middle_Name     varchar(50)    null,
+    Last_Name       varchar(50)    not null,
+    Address         varchar(255)   null,
+    Gender          varchar(20)    null,
+    Phone_Number    varchar(20)    null,
+    Job_Position    varchar(100)   null,
+    Hire_Date       date           null,
+    Department_ID   int            null,
+    Employment_Type varchar(50)    null,
+    Pay_Type        varchar(50)    null,
+    Pay_Rate        decimal(10, 2) null,
+    constraint SSN
+        unique (SSN),
+    constraint employee_ibfk_1
+        foreign key (Department_ID) references Department (Department_ID)
+            on update cascade on delete set null
+);
+
+create index Department_ID
+    on Employee (Department_ID);
+
+create table Employee_Attraction
+(
+    Employee_ID     int          not null,
+    Attraction_ID   int          not null,
+    Assignment_Date date         null,
+    Role            varchar(100) null,
+    primary key (Employee_ID, Attraction_ID),
+    constraint employee_attraction_ibfk_1
+        foreign key (Employee_ID) references Employee (Employee_ID)
+            on update cascade on delete cascade,
+    constraint employee_attraction_ibfk_2
+        foreign key (Attraction_ID) references Attraction (Attraction_ID)
+            on update cascade on delete cascade
+);
+
+create index Attraction_ID
+    on Employee_Attraction (Attraction_ID);
+
+create table Enclosure
+(
+    Enclosure_ID      int auto_increment
+        primary key,
+    Enclosure_Name    varchar(100)                                                not null,
+    Enclosure_Type    varchar(100)                                                null,
+    Location          varchar(100)                                                null,
+    Capacity          int                                                         not null,
+    Animal_Count      int                                          default 0      not null,
+    Status            enum ('Open', 'Closed', 'Under Maintenance') default 'Open' not null,
+    Closed_Reason     varchar(255)                                                null,
+    Status_Changed_At datetime                                                    null
+);
+
+create definer = avnadmin@`%` trigger check_enclosure_capacity
+    before update
+    on Enclosure
+    for each row
+BEGIN
+    IF NEW.Capacity < 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Enclosure capacity cannot be negative';
+    END IF;
+    IF NEW.Animal_Count < 0 OR NEW.Animal_Count > NEW.Capacity THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Enclosure capacity cannot be below its current animal count';
+    END IF;
+END;
+
+create table Food_Stand
+(
+    Stand_ID     int auto_increment
+        primary key,
+    Stand_Name   varchar(100) not null,
+    Description  varchar(255) null,
+    Location     varchar(100) null,
+    Category     varchar(50)  null,
+    Opening_Time time         null,
+    Closing_Time time         null
+);
+
+create table Food_Item
+(
+    FoodItem_ID   int auto_increment
+        primary key,
+    Stand_ID      int            not null,
+    FoodItem_Name varchar(100)   not null,
+    Description   varchar(255)   null,
+    Price         decimal(10, 2) not null,
+    Category      varchar(50)    null,
+    constraint food_item_ibfk_1
+        foreign key (Stand_ID) references Food_Stand (Stand_ID)
+            on update cascade on delete cascade
+);
+
+create index Stand_ID
+    on Food_Item (Stand_ID);
+
+create table Gift_Shop
+(
+    GiftShop_ID   int auto_increment
+        primary key,
+    GiftShop_Name varchar(100) not null,
+    Category      varchar(50)  null,
+    Location      varchar(100) null,
+    Opening_Time  time         null,
+    Closing_Time  time         null
+);
+
+create table Habitat_Inspection
+(
+    Inspection_ID         int auto_increment
+        primary key,
+    Enclosure_ID          int                                                                                                                                                                        not null,
+    Inspector_Employee_ID int                                                                                                                                                                        null,
+    Inspection_Date       datetime                                                                                                                                         default CURRENT_TIMESTAMP not null,
+    Result                enum ('Pass', 'Minor Issues', 'Critical')                                                                                                                                  not null,
+    Issue_Category        enum ('None', 'Structural', 'Barrier/Fencing', 'Water Quality', 'Temperature/Climate', 'Electrical', 'Sanitation', 'Vegetation/Hazard', 'Other') default 'None'            not null,
+    Findings              varchar(500)                                                                                                                                                               null,
+    constraint fk_inspection_employee
+        foreign key (Inspector_Employee_ID) references Employee (Employee_ID)
+            on update cascade on delete set null,
+    constraint fk_inspection_enclosure
+        foreign key (Enclosure_ID) references Enclosure (Enclosure_ID)
+            on update cascade on delete cascade
+);
+
+create index idx_inspection_enclosure_date
+    on Habitat_Inspection (Enclosure_ID, Inspection_Date);
+
+create definer = avnadmin@`%` trigger trg_inspection_result
+    after insert
+    on Habitat_Inspection
+    for each row
+BEGIN
+    DECLARE v_enc_name VARCHAR(100);
+    DECLARE v_location VARCHAR(100);
+
+    SELECT Enclosure_Name, Location INTO v_enc_name, v_location
+    FROM Enclosure WHERE Enclosure_ID = NEW.Enclosure_ID;
+
+    IF NEW.Result = 'Critical' THEN
+        INSERT INTO Maintenance (Description, Location, Request_Date, Status, Enclosure_ID, Priority, Inspection_ID)
+        VALUES (CONCAT('EMERGENCY - ', NEW.Issue_Category, ': ', COALESCE(NEW.Findings, 'see inspection')),
+                v_location, DATE(NEW.Inspection_Date), 'Open', NEW.Enclosure_ID, 'Emergency', NEW.Inspection_ID);
+
+        UPDATE Enclosure
+        SET Status = 'Closed',
+            Closed_Reason = CONCAT('Critical inspection #', NEW.Inspection_ID, ' (', NEW.Issue_Category, ')'),
+            Status_Changed_At = NOW()
+        WHERE Enclosure_ID = NEW.Enclosure_ID;
+
+        UPDATE Animal SET Needs_Relocation = 1
+        WHERE Enclosure_ID = NEW.Enclosure_ID AND Is_Active = 1;
+
+        INSERT INTO Care_Task (Animal_ID, Enclosure_ID, Task_Category, Title, Description, Priority,
+                               Due_At, Source_Type, Source_ID)
+        SELECT a.Animal_ID, a.Enclosure_ID, 'Relocation',
+               CONCAT('Relocate ', a.Animal_Name, ' out of ', v_enc_name),
+               CONCAT('Enclosure closed: ', NEW.Issue_Category, '. ', COALESCE(NEW.Findings, '')),
+               'Urgent', NEW.Inspection_Date + INTERVAL 4 HOUR, 'Habitat_Inspection', NEW.Inspection_ID
+        FROM Animal a
+        WHERE a.Enclosure_ID = NEW.Enclosure_ID
+          AND a.Is_Active = 1
+          AND NOT EXISTS (SELECT 1 FROM Care_Task t
+                          WHERE t.Animal_ID = a.Animal_ID AND t.Task_Category = 'Relocation'
+                            AND t.Status IN ('Open', 'In Progress'));
+
+        CALL sp_notify_enclosure_keepers(NEW.Enclosure_ID, NULL, 'Urgent',
+                                         CONCAT(v_enc_name, ' is CLOSED after a critical inspection (', NEW.Issue_Category,
+                                                '). Move all animals to safe holding now.'));
+
+    ELSEIF NEW.Result = 'Pass' THEN
+        IF EXISTS (SELECT 1 FROM Enclosure WHERE Enclosure_ID = NEW.Enclosure_ID AND Status = 'Closed')
+            AND NOT EXISTS (SELECT 1 FROM Maintenance
+                            WHERE Enclosure_ID = NEW.Enclosure_ID AND Priority = 'Emergency'
+                              AND NOT (Status <=> 'Completed')) THEN
+
+            UPDATE Enclosure
+            SET Status = 'Open', Closed_Reason = NULL, Status_Changed_At = NOW()
+            WHERE Enclosure_ID = NEW.Enclosure_ID;
+
+            UPDATE Animal SET Needs_Relocation = 0
+            WHERE Enclosure_ID = NEW.Enclosure_ID AND Needs_Relocation = 1;
+
+            UPDATE Care_Task
+            SET Status = 'Cancelled', Completed_At = NOW()
+            WHERE Enclosure_ID = NEW.Enclosure_ID AND Task_Category = 'Relocation'
+              AND Status IN ('Open', 'In Progress');
+
+            UPDATE Care_Task
+            SET Status = 'Completed', Completed_At = NOW()
+            WHERE Enclosure_ID = NEW.Enclosure_ID AND Task_Category = 'Inspection'
+              AND Status IN ('Open', 'In Progress');
+
+            CALL sp_notify_enclosure_keepers(NEW.Enclosure_ID, NULL, 'Info',
+                                             CONCAT(v_enc_name, ' passed re-inspection and is open again.'));
+        END IF;
+    END IF;
+END;
+
+create table Keeper
+(
+    Employee_ID      int         not null
+        primary key,
+    Experience_Level varchar(50) null,
+    constraint keeper_ibfk_1
+        foreign key (Employee_ID) references Employee (Employee_ID)
+            on update cascade on delete cascade
+);
+
+create table Keeper_Enclosure
+(
+    Employee_ID           int  not null,
+    Enclosure_ID          int  not null,
+    Assignment_Start_Date date null,
+    Assignment_End_Date   date null,
+    primary key (Employee_ID, Enclosure_ID),
+    constraint keeper_enclosure_ibfk_1
+        foreign key (Employee_ID) references Keeper (Employee_ID)
+            on update cascade on delete cascade,
+    constraint keeper_enclosure_ibfk_2
+        foreign key (Enclosure_ID) references Enclosure (Enclosure_ID)
+            on update cascade on delete cascade
+);
+
+create index Enclosure_ID
+    on Keeper_Enclosure (Enclosure_ID);
+
+create table Maintenance
+(
+    Maintenance_ID  int auto_increment
+        primary key,
+    Description     varchar(255)                                                 null,
+    Location        varchar(100)                                                 null,
+    Request_Date    date                                                         null,
+    Completion_Date date                                                         null,
+    Status          varchar(50)                                                  null,
+    Cost            decimal(10, 2)                                               null,
+    Employee_ID     int                                                          null,
+    Enclosure_ID    int                                                          null,
+    Attraction_ID   int                                                          null,
+    Stand_ID        int                                                          null,
+    GiftShop_ID     int                                                          null,
+    Priority        enum ('Low', 'Normal', 'High', 'Emergency') default 'Normal' not null,
+    Inspection_ID   int                                                          null,
+    constraint fk_maintenance_inspection
+        foreign key (Inspection_ID) references Habitat_Inspection (Inspection_ID)
+            on delete set null,
+    constraint maintenance_ibfk_1
+        foreign key (Employee_ID) references Employee (Employee_ID)
+            on update cascade on delete set null,
+    constraint maintenance_ibfk_2
+        foreign key (Enclosure_ID) references Enclosure (Enclosure_ID)
+            on update cascade on delete set null,
+    constraint maintenance_ibfk_3
+        foreign key (Attraction_ID) references Attraction (Attraction_ID)
+            on update cascade on delete set null,
+    constraint maintenance_ibfk_4
+        foreign key (Stand_ID) references Food_Stand (Stand_ID)
+            on update cascade on delete set null,
+    constraint maintenance_ibfk_5
+        foreign key (GiftShop_ID) references Gift_Shop (GiftShop_ID)
+            on update cascade on delete set null
+);
+
+create index Attraction_ID
+    on Maintenance (Attraction_ID);
+
+create index Employee_ID
+    on Maintenance (Employee_ID);
+
+create index Enclosure_ID
+    on Maintenance (Enclosure_ID);
+
+create index GiftShop_ID
+    on Maintenance (GiftShop_ID);
+
+create index Stand_ID
+    on Maintenance (Stand_ID);
+
+create definer = avnadmin@`%` trigger trg_emergency_repair_done
+    after update
+    on Maintenance
+    for each row
+BEGIN
+    IF NEW.Status = 'Completed' AND NOT (OLD.Status <=> 'Completed')
+        AND NEW.Priority = 'Emergency' AND NEW.Enclosure_ID IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM Maintenance
+                        WHERE Enclosure_ID = NEW.Enclosure_ID AND Priority = 'Emergency'
+                          AND Maintenance_ID <> NEW.Maintenance_ID
+                          AND NOT (Status <=> 'Completed')) THEN
+
+        INSERT INTO Care_Task (Enclosure_ID, Task_Category, Title, Description, Priority,
+                               Assigned_Employee_ID, Due_At, Source_Type, Source_ID)
+        VALUES (NEW.Enclosure_ID, 'Inspection',
+                CONCAT('Re-inspect ', (SELECT Enclosure_Name FROM Enclosure WHERE Enclosure_ID = NEW.Enclosure_ID),
+                       ' before reopening'),
+                CONCAT('Emergency repair #', NEW.Maintenance_ID, ' completed. Record a Pass inspection to reopen.'),
+                'High',
+                (SELECT Inspector_Employee_ID FROM Habitat_Inspection WHERE Inspection_ID = NEW.Inspection_ID),
+                NOW() + INTERVAL 1 DAY, 'Maintenance', NEW.Maintenance_ID);
+    END IF;
+END;
+
+create table Membership_Type
+(
+    MembershipType_ID int auto_increment
+        primary key,
+    Membership_Name   varchar(50)    not null,
+    Price             decimal(10, 2) not null,
+    Benefits          varchar(255)   null,
+    constraint chk_membership_price
+        check (`Price` >= 0)
+);
+
+create table Membership
+(
+    Membership_ID     int auto_increment
+        primary key,
+    Customer_ID       int         not null,
+    MembershipType_ID int         not null,
+    Start_Date        date        not null,
+    Expiration_Date   date        not null,
+    Status            varchar(20) not null,
+    constraint fk_membership_customer
+        foreign key (Customer_ID) references Customer (Customer_ID)
+            on update cascade on delete cascade,
+    constraint fk_membership_type
+        foreign key (MembershipType_ID) references Membership_Type (MembershipType_ID),
+    constraint chk_membership_dates
+        check (`Expiration_Date` >= `Start_Date`)
+);
+
+create table Product
+(
+    Product_ID   int auto_increment
+        primary key,
+    GiftShop_ID  int            not null,
+    Product_Name varchar(100)   not null,
+    Description  varchar(255)   null,
+    Category     varchar(50)    null,
+    Price        decimal(10, 2) not null,
+    constraint product_ibfk_1
+        foreign key (GiftShop_ID) references Gift_Shop (GiftShop_ID)
+            on update cascade on delete cascade
+);
+
+create table Inventory
+(
+    Inventory_ID      int auto_increment
+        primary key,
+    Product_ID        int                                not null,
+    Quantity_In_Stock int      default 0                 not null,
+    Reorder_Level     int      default 0                 not null,
+    Last_Updated      datetime default CURRENT_TIMESTAMP null,
+    constraint Product_ID
+        unique (Product_ID),
+    constraint inventory_ibfk_1
+        foreign key (Product_ID) references Product (Product_ID)
+            on update cascade on delete cascade
+);
+
+create index GiftShop_ID
+    on Product (GiftShop_ID);
+
+create table Sale
+(
+    Sale_ID        int auto_increment
+        primary key,
+    Sale_Date      datetime default CURRENT_TIMESTAMP not null,
+    Employee_ID    int                                null,
+    Customer_ID    int                                null,
+    Stand_ID       int                                null,
+    GiftShop_ID    int                                null,
+    Sale_Type      varchar(20)                        not null,
+    Total_Amount   decimal(10, 2)                     not null,
+    Payment_Method varchar(50)                        null,
+    constraint sale_ibfk_1
+        foreign key (Employee_ID) references Employee (Employee_ID)
+            on update cascade on delete set null,
+    constraint sale_ibfk_2
+        foreign key (Customer_ID) references Customer (Customer_ID)
+            on update cascade on delete set null,
+    constraint sale_ibfk_3
+        foreign key (Stand_ID) references Food_Stand (Stand_ID)
+            on update cascade on delete set null,
+    constraint sale_ibfk_4
+        foreign key (GiftShop_ID) references Gift_Shop (GiftShop_ID)
+            on update cascade on delete set null
+);
+
+create index Customer_ID
+    on Sale (Customer_ID);
+
+create index Employee_ID
+    on Sale (Employee_ID);
+
+create index GiftShop_ID
+    on Sale (GiftShop_ID);
+
+create index Stand_ID
+    on Sale (Stand_ID);
+
+create table Sale_Item
+(
+    SaleItem_ID int auto_increment
+        primary key,
+    Sale_ID     int            not null,
+    Product_ID  int            null,
+    FoodItem_ID int            null,
+    Quantity    int            not null,
+    Unit_Price  decimal(10, 2) not null,
+    constraint sale_item_ibfk_1
+        foreign key (Sale_ID) references Sale (Sale_ID),
+    constraint sale_item_ibfk_2
+        foreign key (Product_ID) references Product (Product_ID),
+    constraint sale_item_ibfk_3
+        foreign key (FoodItem_ID) references Food_Item (FoodItem_ID)
+);
+
+create index FoodItem_ID
+    on Sale_Item (FoodItem_ID);
+
+create index Product_ID
+    on Sale_Item (Product_ID);
+
+create index Sale_ID
+    on Sale_Item (Sale_ID);
+
+create definer = avnadmin@`%` trigger sale_item_added
+    after insert
+    on Sale_Item
+    for each row
+BEGIN
+    IF NEW.Quantity IS NULL OR NEW.Quantity <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Quantity must be greater than zero';
+    END IF;
+    IF NEW.Unit_Price IS NULL OR NEW.Unit_Price < 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Unit price must be zero or greater';
+    END IF;
+    IF (NEW.Product_ID IS NULL) = (NEW.FoodItem_ID IS NULL) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Choose exactly one Product_ID or FoodItem_ID';
+    END IF;
+    IF NEW.Product_ID IS NOT NULL THEN
+        IF NOT EXISTS (SELECT 1 FROM Sale s JOIN Product p ON p.GiftShop_ID = s.GiftShop_ID WHERE s.Sale_ID = NEW.Sale_ID AND p.Product_ID = NEW.Product_ID AND s.Sale_Type = 'GiftShop' AND s.Stand_ID IS NULL FOR SHARE) THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Product must belong to the gift shop on this sale';
+        END IF;
+        UPDATE Inventory SET Quantity_In_Stock = Quantity_In_Stock - NEW.Quantity, Last_Updated = CURRENT_TIMESTAMP WHERE Product_ID = NEW.Product_ID AND Quantity_In_Stock >= NEW.Quantity;
+        IF ROW_COUNT() <> 1 THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Insufficient stock or missing inventory record';
+        END IF;
+    END IF;
+    IF NEW.FoodItem_ID IS NOT NULL THEN
+        IF NOT EXISTS (SELECT 1 FROM Sale s JOIN Food_Item f ON f.Stand_ID = s.Stand_ID WHERE s.Sale_ID = NEW.Sale_ID AND f.FoodItem_ID = NEW.FoodItem_ID AND s.Sale_Type = 'Food' AND s.GiftShop_ID IS NULL FOR SHARE) THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Food item must belong to the food stand on this sale';
+        END IF;
+    END IF;
+    UPDATE Sale SET Total_Amount = Total_Amount + NEW.Quantity * NEW.Unit_Price WHERE Sale_ID = NEW.Sale_ID;
+END;
+
+create definer = avnadmin@`%` trigger sale_item_deleted
+    after delete
+    on Sale_Item
+    for each row
+BEGIN
+    IF OLD.Product_ID IS NOT NULL THEN
+        UPDATE Inventory SET Quantity_In_Stock = Quantity_In_Stock + OLD.Quantity, Last_Updated = CURRENT_TIMESTAMP WHERE Product_ID = OLD.Product_ID;
+        IF ROW_COUNT() <> 1 THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cannot restore stock: missing inventory record';
+        END IF;
+    END IF;
+    UPDATE Sale SET Total_Amount = Total_Amount - OLD.Quantity * OLD.Unit_Price WHERE Sale_ID = OLD.Sale_ID;
+END;
+
+create definer = avnadmin@`%` trigger sale_item_updated
+    after update
+    on Sale_Item
+    for each row
+BEGIN
+    IF NEW.Quantity IS NULL OR NEW.Quantity <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Quantity must be greater than zero';
+    END IF;
+    IF NEW.Unit_Price IS NULL OR NEW.Unit_Price < 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Unit price must be zero or greater';
+    END IF;
+    IF NEW.SaleItem_ID <> OLD.SaleItem_ID OR NEW.Sale_ID <> OLD.Sale_ID OR NOT (NEW.Product_ID <=> OLD.Product_ID) OR NOT (NEW.FoodItem_ID <=> OLD.FoodItem_ID) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Only quantity and unit price can be edited; delete and reinsert to change the item';
+    END IF;
+    IF NEW.Product_ID IS NOT NULL THEN
+        IF NOT EXISTS (SELECT 1 FROM Sale s JOIN Product p ON p.GiftShop_ID = s.GiftShop_ID WHERE s.Sale_ID = NEW.Sale_ID AND p.Product_ID = NEW.Product_ID AND s.Sale_Type = 'GiftShop' AND s.Stand_ID IS NULL FOR SHARE) THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Product must belong to the gift shop on this sale';
+        END IF;
+    END IF;
+    IF NEW.FoodItem_ID IS NOT NULL THEN
+        IF NOT EXISTS (SELECT 1 FROM Sale s JOIN Food_Item f ON f.Stand_ID = s.Stand_ID WHERE s.Sale_ID = NEW.Sale_ID AND f.FoodItem_ID = NEW.FoodItem_ID AND s.Sale_Type = 'Food' AND s.GiftShop_ID IS NULL FOR SHARE) THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Food item must belong to the food stand on this sale';
+        END IF;
+    END IF;
+    IF NEW.Product_ID IS NOT NULL AND NEW.Quantity <> OLD.Quantity THEN
+        UPDATE Inventory SET Quantity_In_Stock = Quantity_In_Stock - (NEW.Quantity - OLD.Quantity), Last_Updated = CURRENT_TIMESTAMP WHERE Product_ID = NEW.Product_ID AND Quantity_In_Stock >= GREATEST(NEW.Quantity - OLD.Quantity, 0);
+        IF ROW_COUNT() <> 1 THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Insufficient stock or missing inventory record';
+        END IF;
+    END IF;
+    UPDATE Sale SET Total_Amount = Total_Amount - OLD.Quantity * OLD.Unit_Price + NEW.Quantity * NEW.Unit_Price WHERE Sale_ID = NEW.Sale_ID;
+END;
+
+create table Species
+(
+    Species_ID          int auto_increment
+        primary key,
+    Common_Name         varchar(100) not null,
+    Scientific_Name     varchar(150) null,
+    Diet_Type           varchar(50)  null,
+    Conservation_Status varchar(100) null,
+    Habitat_Type        varchar(100) null
+);
+
+create table Animal
+(
+    Animal_ID                 int auto_increment
+        primary key,
+    Animal_Name               varchar(100)         not null,
+    Species_ID                int                  not null,
+    Gender                    varchar(20)          null,
+    Date_of_Birth             date                 null,
+    Health_Status             varchar(100)         null,
+    Enclosure_ID              int                  not null,
+    Date_Acquired             date                 null,
+    Acquisition_Type          varchar(100)         null,
+    Is_Active                 tinyint(1) default 1 not null,
+    Public_Encounter_Eligible tinyint(1) default 1 not null,
+    Needs_Relocation          tinyint(1) default 0 not null,
+    Mother_ID                 int                  null,
+    Father_ID                 int                  null,
+    Breeding_ID               int                  null,
+    constraint animal_ibfk_1
+        foreign key (Species_ID) references Species (Species_ID)
+            on update cascade,
+    constraint animal_ibfk_2
+        foreign key (Enclosure_ID) references Enclosure (Enclosure_ID)
+            on update cascade,
+    constraint fk_animal_father
+        foreign key (Father_ID) references Animal (Animal_ID)
+            on delete set null,
+    constraint fk_animal_mother
+        foreign key (Mother_ID) references Animal (Animal_ID)
+            on delete set null
+);
+
+create index Enclosure_ID
+    on Animal (Enclosure_ID);
+
+create index Species_ID
+    on Animal (Species_ID);
+
+create definer = avnadmin@`%` trigger animal_added
+    after insert
+    on Animal
+    for each row
+BEGIN
+    UPDATE Enclosure SET Animal_Count = Animal_Count + 1 WHERE Enclosure_ID = NEW.Enclosure_ID AND Animal_Count < Capacity;
+    IF ROW_COUNT() <> 1 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Enclosure is full or does not exist';
+    END IF;
+END;
+
+create definer = avnadmin@`%` trigger animal_deleted
+    after delete
+    on Animal
+    for each row
+BEGIN
+    UPDATE Enclosure SET Animal_Count = Animal_Count - 1 WHERE Enclosure_ID = OLD.Enclosure_ID AND Animal_Count > 0;
+    IF ROW_COUNT() <> 1 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Enclosure occupancy is inconsistent';
+    END IF;
+END;
+
+create definer = avnadmin@`%` trigger animal_moved
+    after update
+    on Animal
+    for each row
+BEGIN
+    IF NEW.Enclosure_ID <> OLD.Enclosure_ID THEN
+        UPDATE Enclosure SET Animal_Count = Animal_Count + 1 WHERE Enclosure_ID = NEW.Enclosure_ID AND Animal_Count < Capacity;
+        IF ROW_COUNT() <> 1 THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Destination enclosure is full or does not exist';
+        END IF;
+        UPDATE Enclosure SET Animal_Count = Animal_Count - 1 WHERE Enclosure_ID = OLD.Enclosure_ID AND Animal_Count > 0;
+        IF ROW_COUNT() <> 1 THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Original enclosure occupancy is inconsistent';
+        END IF;
+    END IF;
+END;
+
+create definer = avnadmin@`%` trigger trg_animal_relocation
+    before update
+    on Animal
+    for each row
+BEGIN
+    IF NOT (NEW.Enclosure_ID <=> OLD.Enclosure_ID) THEN
+        IF EXISTS (SELECT 1 FROM Enclosure WHERE Enclosure_ID = NEW.Enclosure_ID AND Status <> 'Open') THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cannot move an animal into a closed enclosure';
+        END IF;
+
+        IF OLD.Needs_Relocation = 1 THEN
+            SET NEW.Needs_Relocation = 0;
+            UPDATE Care_Task
+            SET Status = 'Completed', Completed_At = NOW()
+            WHERE Animal_ID = NEW.Animal_ID AND Task_Category = 'Relocation'
+              AND Status IN ('Open', 'In Progress');
+        END IF;
+    END IF;
+END;
+
+create definer = avnadmin@`%` trigger trg_offspring_born
+    after insert
+    on Animal
+    for each row
+BEGIN
+    DECLARE v_program INT DEFAULT NULL;
+    DECLARE v_dam_name VARCHAR(100) DEFAULT NULL;
+    DECLARE v_sire_name VARCHAR(100) DEFAULT NULL;
+    DECLARE v_born DATE;
+    DECLARE v_vet INT;
+
+    IF NEW.Breeding_ID IS NOT NULL THEN
+        SET v_born = COALESCE(NEW.Date_of_Birth, CURDATE());
+        SET v_vet = fn_least_busy_vet();
+
+        SELECT Program_ID INTO v_program FROM Breeding_Event WHERE Breeding_ID = NEW.Breeding_ID;
+        IF v_program IS NULL THEN
+            SELECT Program_ID INTO v_program FROM Conservation_Program
+            WHERE Species_ID = NEW.Species_ID AND Status = 'Active'
+            ORDER BY Start_Date LIMIT 1;
+        END IF;
+
+        SELECT Animal_Name INTO v_dam_name FROM Animal WHERE Animal_ID = NEW.Mother_ID;
+        SELECT Animal_Name INTO v_sire_name FROM Animal WHERE Animal_ID = NEW.Father_ID;
+
+        UPDATE Breeding_Event
+        SET Outcome = 'Offspring Born',
+            Outcome_Date = COALESCE(Outcome_Date, v_born),
+            Offspring_Count = Offspring_Count + 1
+        WHERE Breeding_ID = NEW.Breeding_ID;
+
+        INSERT INTO Conservation_Record (Animal_ID, Program_ID, Breeding_ID, Enrollment_Date, Status, Genetic_Notes)
+        VALUES (NEW.Animal_ID, v_program, NEW.Breeding_ID, CURDATE(), 'Enrolled',
+                CONCAT('Dam: ', COALESCE(v_dam_name, 'unknown'), '; Sire: ', COALESCE(v_sire_name, 'unknown')));
+
+        INSERT INTO Care_Task (Animal_ID, Enclosure_ID, Task_Category, Title, Description, Priority,
+                               Assigned_Employee_ID, Due_At, Source_Type, Source_ID)
+        VALUES (NEW.Animal_ID, NEW.Enclosure_ID, 'Veterinary', CONCAT('Neonatal exam (24 h): ', NEW.Animal_Name),
+                'Weight, hydration, nursing check, sex determination.', 'Urgent', v_vet,
+                v_born + INTERVAL 1 DAY, 'Breeding_Event', NEW.Breeding_ID),
+               (NEW.Animal_ID, NEW.Enclosure_ID, 'Veterinary', CONCAT('2-week wellness exam: ', NEW.Animal_Name),
+                'Growth check against species norms; parasite screen.', 'High', v_vet,
+                v_born + INTERVAL 14 DAY, 'Breeding_Event', NEW.Breeding_ID),
+               (NEW.Animal_ID, NEW.Enclosure_ID, 'Veterinary', CONCAT('6-week exam and vaccinations: ', NEW.Animal_Name),
+                'First vaccination series and microchip.', 'Normal', v_vet,
+                v_born + INTERVAL 42 DAY, 'Breeding_Event', NEW.Breeding_ID),
+               (NEW.Animal_ID, NEW.Enclosure_ID, 'Conservation', CONCAT('Register birth in studbook: ', NEW.Animal_Name),
+                'Submit birth and parentage to the program studbook keeper; record Studbook_Number.', 'Normal', NULL,
+                v_born + INTERVAL 30 DAY, 'Breeding_Event', NEW.Breeding_ID);
+
+        CALL sp_notify_enclosure_keepers(NEW.Enclosure_ID, NEW.Animal_ID, 'Important',
+                                         CONCAT('New birth: ', NEW.Animal_Name, ' (dam ', COALESCE(v_dam_name, 'unknown'),
+                                                '). Monitor nursing and keep public away from the den area.'));
+    END IF;
+END;
+
+create definer = avnadmin@`%` trigger trg_offspring_lineage
+    before insert
+    on Animal
+    for each row
+BEGIN
+    DECLARE v_dam INT;
+    DECLARE v_sire INT;
+    DECLARE v_outcome VARCHAR(20);
+
+    IF NEW.Breeding_ID IS NOT NULL THEN
+        SELECT Dam_ID, Sire_ID, Outcome INTO v_dam, v_sire, v_outcome
+        FROM Breeding_Event WHERE Breeding_ID = NEW.Breeding_ID;
+
+        IF v_outcome = 'Unsuccessful' THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'This breeding event is marked unsuccessful';
+        END IF;
+
+        SET NEW.Mother_ID = COALESCE(NEW.Mother_ID, v_dam);
+        SET NEW.Father_ID = COALESCE(NEW.Father_ID, v_sire);
+        SET NEW.Acquisition_Type = COALESCE(NEW.Acquisition_Type, 'Born at Zoo');
+        SET NEW.Date_Acquired = COALESCE(NEW.Date_Acquired, NEW.Date_of_Birth, CURDATE());
+    END IF;
+END;
+
+create table Animal_Employee
+(
+    Employee_ID   int          not null,
+    Animal_ID     int          not null,
+    Assigned_Role varchar(100) null,
+    primary key (Employee_ID, Animal_ID),
+    constraint animal_employee_ibfk_1
+        foreign key (Employee_ID) references Employee (Employee_ID)
+            on update cascade on delete cascade,
+    constraint animal_employee_ibfk_2
+        foreign key (Animal_ID) references Animal (Animal_ID)
+            on update cascade on delete cascade
+);
+
+create index Animal_ID
+    on Animal_Employee (Animal_ID);
+
+create table Care_Task
+(
+    Task_ID              int auto_increment
+        primary key,
+    Animal_ID            int                                                                              null,
+    Enclosure_ID         int                                                                              null,
+    Task_Category        enum ('Veterinary', 'Feeding', 'Relocation', 'Inspection', 'Conservation')       not null,
+    Title                varchar(150)                                                                     not null,
+    Description          varchar(500)                                                                     null,
+    Priority             enum ('Low', 'Normal', 'High', 'Urgent')               default 'Normal'          not null,
+    Assigned_Employee_ID int                                                                              null,
+    Due_At               datetime                                                                         null,
+    Status               enum ('Open', 'In Progress', 'Completed', 'Cancelled') default 'Open'            not null,
+    Source_Type          varchar(30)                                                                      null,
+    Source_ID            int                                                                              null,
+    Created_At           datetime                                               default CURRENT_TIMESTAMP not null,
+    Completed_At         datetime                                                                         null,
+    constraint fk_task_animal
+        foreign key (Animal_ID) references Animal (Animal_ID)
+            on update cascade on delete cascade,
+    constraint fk_task_employee
+        foreign key (Assigned_Employee_ID) references Employee (Employee_ID)
+            on update cascade on delete set null,
+    constraint fk_task_enclosure
+        foreign key (Enclosure_ID) references Enclosure (Enclosure_ID)
+            on update cascade on delete set null
+);
+
+create index idx_task_assignee
+    on Care_Task (Assigned_Employee_ID, Status);
+
+create index idx_task_queue
+    on Care_Task (Status, Priority, Due_At);
+
+create table Conservation_Program
+(
+    Program_ID           int auto_increment
+        primary key,
+    Program_Name         varchar(150)                                                                     not null,
+    Species_ID           int                                                                              not null,
+    Program_Type         enum ('Species Survival Plan', 'Breeding Program', 'Reintroduction', 'Research') not null,
+    Partner_Organization varchar(150)                                                                     null,
+    Target_Population    int                                                                              null,
+    Start_Date           date                                                                             null,
+    Status               enum ('Active', 'Paused', 'Completed') default 'Active'                          not null,
+    constraint fk_program_species
+        foreign key (Species_ID) references Species (Species_ID)
+            on update cascade
+);
+
+create table Breeding_Event
+(
+    Breeding_ID         int auto_increment
+        primary key,
+    Program_ID          int                                                                  null,
+    Dam_ID              int                                                                  not null,
+    Sire_ID             int                                                                  null,
+    Pairing_Date        date                                                                 null,
+    Expected_Birth_Date date                                                                 null,
+    Outcome             enum ('Pending', 'Offspring Born', 'Unsuccessful') default 'Pending' not null,
+    Outcome_Date        date                                                                 null,
+    Offspring_Count     int                                                default 0         not null,
+    Notes               varchar(255)                                                         null,
+    constraint fk_breeding_dam
+        foreign key (Dam_ID) references Animal (Animal_ID),
+    constraint fk_breeding_program
+        foreign key (Program_ID) references Conservation_Program (Program_ID)
+            on delete set null,
+    constraint fk_breeding_sire
+        foreign key (Sire_ID) references Animal (Animal_ID)
+            on delete set null
+);
+
+alter table Animal
+    add constraint fk_animal_breeding
+        foreign key (Breeding_ID) references Breeding_Event (Breeding_ID)
+            on delete set null;
+
+create table Conservation_Record
+(
+    Conservation_Record_ID int auto_increment
+        primary key,
+    Animal_ID              int                                                                                 not null,
+    Program_ID             int                                                                                 null,
+    Breeding_ID            int                                                                                 null,
+    Studbook_Number        varchar(50)                                                                         null,
+    Enrollment_Date        date                                                                                not null,
+    Status                 enum ('Enrolled', 'Transferred', 'Released to Wild', 'Deceased') default 'Enrolled' not null,
+    Genetic_Notes          varchar(500)                                                                        null,
+    constraint fk_conservation_animal
+        foreign key (Animal_ID) references Animal (Animal_ID)
+            on update cascade on delete cascade,
+    constraint fk_conservation_breeding
+        foreign key (Breeding_ID) references Breeding_Event (Breeding_ID)
+            on delete set null,
+    constraint fk_conservation_program
+        foreign key (Program_ID) references Conservation_Program (Program_ID)
+            on delete set null
+);
+
+create table Staff_Notification
+(
+    Notification_ID int auto_increment
+        primary key,
+    Employee_ID     int                                                            not null,
+    Animal_ID       int                                                            null,
+    Enclosure_ID    int                                                            null,
+    Priority        enum ('Info', 'Important', 'Urgent') default 'Info'            not null,
+    Message         varchar(500)                                                   not null,
+    Created_At      datetime                             default CURRENT_TIMESTAMP not null,
+    Is_Read         tinyint(1)                           default 0                 not null,
+    constraint fk_notif_animal
+        foreign key (Animal_ID) references Animal (Animal_ID)
+            on delete set null,
+    constraint fk_notif_employee
+        foreign key (Employee_ID) references Employee (Employee_ID)
+            on update cascade on delete cascade,
+    constraint fk_notif_enclosure
+        foreign key (Enclosure_ID) references Enclosure (Enclosure_ID)
+            on delete set null
+);
+
+create index idx_notif_inbox
+    on Staff_Notification (Employee_ID, Is_Read, Created_At);
+
+create table Supplier
+(
+    Supplier_ID       int auto_increment
+        primary key,
+    Supplier_Name     varchar(100) not null,
+    Phone             varchar(20)  null,
+    Email             varchar(100) null,
+    Address           varchar(255) null,
+    Delivery_Schedule varchar(100) null
+);
+
+create table Feed
+(
+    Feed_ID           int auto_increment
+        primary key,
+    Feed_Name         varchar(100)   not null,
+    Feed_Type         varchar(50)    null,
+    Supplier_ID       int            null,
+    Quantity_In_Stock decimal(10, 2) null,
+    Storage_Location  varchar(100)   null,
+    Expiration_Date   date           null,
+    constraint feed_ibfk_1
+        foreign key (Supplier_ID) references Supplier (Supplier_ID)
+);
+
+create index Supplier_ID
+    on Feed (Supplier_ID);
+
+create table Feeding_Schedule
+(
+    Schedule_ID          int auto_increment
+        primary key,
+    Animal_ID            int                      not null,
+    Feed_ID              int                      not null,
+    Keeper_Employee_ID   int                      null,
+    Feeding_Time         time                     not null,
+    Quantity             decimal(10, 2)           not null,
+    Unit                 varchar(20) default 'kg' not null,
+    Special_Instructions varchar(255)             null,
+    Is_Active            tinyint(1)  default 1    not null,
+    constraint fk_schedule_animal
+        foreign key (Animal_ID) references Animal (Animal_ID)
+            on update cascade on delete cascade,
+    constraint fk_schedule_feed
+        foreign key (Feed_ID) references Feed (Feed_ID)
+            on update cascade,
+    constraint fk_schedule_keeper
+        foreign key (Keeper_Employee_ID) references Keeper (Employee_ID)
+            on update cascade on delete set null
+);
+
+create table Feeding_Log
+(
+    Feeding_Log_ID          int auto_increment
+        primary key,
+    Schedule_ID             int                                                not null,
+    Feeding_Date            date                                               not null,
+    Status                  enum ('Completed', 'Partial', 'Refused', 'Missed') not null,
+    Quantity_Given          decimal(10, 2)                                     null,
+    Recorded_By_Employee_ID int                                                null,
+    Recorded_At             datetime default CURRENT_TIMESTAMP                 not null,
+    Notes                   varchar(255)                                       null,
+    constraint uq_feeding_once_per_day
+        unique (Schedule_ID, Feeding_Date),
+    constraint fk_feedlog_employee
+        foreign key (Recorded_By_Employee_ID) references Employee (Employee_ID)
+            on update cascade on delete set null,
+    constraint fk_feedlog_schedule
+        foreign key (Schedule_ID) references Feeding_Schedule (Schedule_ID)
+            on update cascade on delete cascade
+);
+
+create definer = avnadmin@`%` trigger trg_feeding_problem
+    after insert
+    on Feeding_Log
+    for each row
+BEGIN
+    DECLARE v_animal INT;
+    DECLARE v_name VARCHAR(100);
+    DECLARE v_enclosure INT;
+    DECLARE v_keeper INT;
+    DECLARE v_feed VARCHAR(100);
+    DECLARE v_time TIME;
+    DECLARE v_problems INT DEFAULT 0;
+
+    IF NEW.Status IN ('Missed', 'Refused') THEN
+        SELECT fs.Animal_ID, a.Animal_Name, a.Enclosure_ID, fs.Keeper_Employee_ID, f.Feed_Name, fs.Feeding_Time
+        INTO v_animal, v_name, v_enclosure, v_keeper, v_feed, v_time
+        FROM Feeding_Schedule fs
+                 JOIN Animal a ON a.Animal_ID = fs.Animal_ID
+                 JOIN Feed f ON f.Feed_ID = fs.Feed_ID
+        WHERE fs.Schedule_ID = NEW.Schedule_ID;
+
+        IF NEW.Status = 'Missed' THEN
+            INSERT INTO Care_Task (Animal_ID, Enclosure_ID, Task_Category, Title, Description, Priority,
+                                   Assigned_Employee_ID, Due_At, Source_Type, Source_ID)
+            VALUES (v_animal, v_enclosure, 'Feeding',
+                    CONCAT('PRIORITY make-up feeding: ', v_name),
+                    CONCAT('Missed the ', TIME_FORMAT(v_time, '%h:%i %p'), ' feeding of ', v_feed,
+                           ' on ', NEW.Feeding_Date, '.'),
+                    'Urgent', v_keeper, NOW() + INTERVAL 1 HOUR, 'Feeding_Log', NEW.Feeding_Log_ID);
+
+            CALL sp_notify_enclosure_keepers(v_enclosure, v_animal, 'Urgent',
+                                             CONCAT(v_name, ' missed the ', TIME_FORMAT(v_time, '%h:%i %p'),
+                                                    ' feeding (', v_feed, '). Make-up feeding due within 1 hour.'));
+        END IF;
+
+        SELECT COUNT(*) INTO v_problems
+        FROM Feeding_Log fl
+                 JOIN Feeding_Schedule fs ON fs.Schedule_ID = fl.Schedule_ID
+        WHERE fs.Animal_ID = v_animal
+          AND fl.Status IN ('Missed', 'Refused')
+          AND fl.Feeding_Date BETWEEN NEW.Feeding_Date - INTERVAL 2 DAY AND NEW.Feeding_Date;
+
+        IF v_problems >= 2 AND NOT EXISTS (
+            SELECT 1 FROM Care_Task
+            WHERE Animal_ID = v_animal AND Task_Category = 'Veterinary'
+              AND Source_Type = 'Feeding_Log' AND Status IN ('Open', 'In Progress')) THEN
+
+            INSERT INTO Care_Task (Animal_ID, Enclosure_ID, Task_Category, Title, Description, Priority,
+                                   Assigned_Employee_ID, Due_At, Source_Type, Source_ID)
+            VALUES (v_animal, v_enclosure, 'Veterinary',
+                    CONCAT('Appetite/welfare check: ', v_name),
+                    CONCAT(v_problems, ' missed or refused feedings in the last 3 days.'),
+                    'High', fn_least_busy_vet(), NOW() + INTERVAL 1 DAY, 'Feeding_Log', NEW.Feeding_Log_ID);
+        END IF;
+    END IF;
+END;
+
+create table Species_Feed
+(
+    Species_ID     int            not null,
+    Feed_ID        int            not null,
+    Daily_Quantity decimal(10, 2) null,
+    primary key (Species_ID, Feed_ID),
+    constraint species_feed_ibfk_1
+        foreign key (Species_ID) references Species (Species_ID)
+            on update cascade on delete cascade,
+    constraint species_feed_ibfk_2
+        foreign key (Feed_ID) references Feed (Feed_ID)
+            on update cascade on delete cascade
+);
+
+create index Feed_ID
+    on Species_Feed (Feed_ID);
+
+create table Supplier_Product
+(
+    Supplier_ID       int            not null,
+    Product_ID        int            not null,
+    Unit_Cost         decimal(10, 2) null,
+    Availability      varchar(50)    null,
+    Delivery_Schedule varchar(100)   null,
+    primary key (Supplier_ID, Product_ID),
+    constraint supplier_product_ibfk_1
+        foreign key (Supplier_ID) references Supplier (Supplier_ID)
+            on update cascade on delete cascade,
+    constraint supplier_product_ibfk_2
+        foreign key (Product_ID) references Product (Product_ID)
+            on update cascade on delete cascade
+);
+
+create index Product_ID
+    on Supplier_Product (Product_ID);
+
+create table Ticket_Sale
+(
+    TicketPurchase_ID int auto_increment
+        primary key,
+    Customer_ID       int                                not null,
+    Purchase_Date     datetime default CURRENT_TIMESTAMP not null,
+    Total_Amount      decimal(10, 2)                     not null,
+    Payment_Method    varchar(50)                        null,
+    constraint ticket_sale_ibfk_1
+        foreign key (Customer_ID) references Customer (Customer_ID)
+            on update cascade
+);
+
+create index Customer_ID
+    on Ticket_Sale (Customer_ID);
+
+create table Ticket_Type
+(
+    TicketType_ID            int auto_increment
+        primary key,
+    TicketType_Name          varchar(50)    not null,
+    Price                    decimal(10, 2) not null,
+    Eligibility_Requirements varchar(255)   null
+);
+
+create table Ticket_Attraction
+(
+    TicketType_ID int not null,
+    Attraction_ID int not null,
+    primary key (TicketType_ID, Attraction_ID),
+    constraint ticket_attraction_ibfk_1
+        foreign key (TicketType_ID) references Ticket_Type (TicketType_ID)
+            on update cascade on delete cascade,
+    constraint ticket_attraction_ibfk_2
+        foreign key (Attraction_ID) references Attraction (Attraction_ID)
+            on update cascade on delete cascade
+);
+
+create index Attraction_ID
+    on Ticket_Attraction (Attraction_ID);
+
+create table Ticket_Purchase_Item
+(
+    TicketPurchase_ID int            not null,
+    TicketType_ID     int            not null,
+    Quantity          int            not null,
+    Unit_Price        decimal(10, 2) not null,
+    primary key (TicketPurchase_ID, TicketType_ID),
+    constraint ticket_purchase_item_ibfk_1
+        foreign key (TicketPurchase_ID) references Ticket_Sale (TicketPurchase_ID)
+            on update cascade on delete cascade,
+    constraint ticket_purchase_item_ibfk_2
+        foreign key (TicketType_ID) references Ticket_Type (TicketType_ID)
+            on update cascade
+);
+
+create index TicketType_ID
+    on Ticket_Purchase_Item (TicketType_ID);
+
+create definer = avnadmin@`%` trigger ticket_item_added
+    after insert
+    on Ticket_Purchase_Item
+    for each row
+BEGIN
+    IF NEW.Quantity IS NULL OR NEW.Quantity <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Quantity must be greater than zero';
+    END IF;
+    IF NEW.Unit_Price IS NULL OR NEW.Unit_Price < 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Unit price must be zero or greater';
+    END IF;
+    UPDATE Ticket_Sale SET Total_Amount = Total_Amount + NEW.Quantity * NEW.Unit_Price WHERE TicketPurchase_ID = NEW.TicketPurchase_ID;
+END;
+
+create definer = avnadmin@`%` trigger ticket_item_deleted
+    after delete
+    on Ticket_Purchase_Item
+    for each row
+BEGIN
+    UPDATE Ticket_Sale SET Total_Amount = Total_Amount - OLD.Quantity * OLD.Unit_Price WHERE TicketPurchase_ID = OLD.TicketPurchase_ID;
+END;
+
+create definer = avnadmin@`%` trigger ticket_item_updated
+    after update
+    on Ticket_Purchase_Item
+    for each row
+BEGIN
+    IF NEW.Quantity IS NULL OR NEW.Quantity <= 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Quantity must be greater than zero';
+    END IF;
+    IF NEW.Unit_Price IS NULL OR NEW.Unit_Price < 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Unit price must be zero or greater';
+    END IF;
+    IF NEW.TicketPurchase_ID <> OLD.TicketPurchase_ID OR NEW.TicketType_ID <> OLD.TicketType_ID THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Only ticket quantity and unit price can be edited';
+    END IF;
+    UPDATE Ticket_Sale SET Total_Amount = Total_Amount - OLD.Quantity * OLD.Unit_Price + NEW.Quantity * NEW.Unit_Price WHERE TicketPurchase_ID = NEW.TicketPurchase_ID;
+END;
+
+create table User_Account
+(
+    User_ID       int auto_increment
+        primary key,
+    Username      varchar(50)                          not null,
+    Password_Hash varchar(255)                         not null,
+    Role          varchar(20)                          not null,
+    Employee_ID   int                                  null,
+    Is_Active     tinyint(1) default 1                 not null,
+    Created_At    datetime   default CURRENT_TIMESTAMP not null,
+    Last_Login    datetime                             null,
+    constraint Username
+        unique (Username),
+    constraint fk_user_employee
+        foreign key (Employee_ID) references Employee (Employee_ID)
+            on update cascade on delete set null,
+    constraint chk_user_role
+        check (`Role` in (_utf8mb4\'ReadOnly\',_utf8mb4\'Admin\',_utf8mb4\'SuperUser\',_utf8mb4\'DBA\',_utf8mb4\'Zookeeper\',_utf8mb4\'Veterinarian\',_utf8mb4\'Cashier\'))
+);
+
+create table Veterinarian
+(
+    Employee_ID    int          not null
+        primary key,
+    Specialization varchar(100) null,
+    constraint veterinarian_ibfk_1
+        foreign key (Employee_ID) references Employee (Employee_ID)
+            on update cascade on delete cascade
+);
+
+create table Health_Record
+(
+    Health_Record_ID int auto_increment
+        primary key,
+    Animal_ID        int                                                                                        not null,
+    Vet_Employee_ID  int                                                                                        null,
+    Exam_Date        datetime                                     default CURRENT_TIMESTAMP                     not null,
+    Record_Type      enum ('Routine Checkup', 'Illness', 'Injury', 'Vaccination', 'Follow-up', 'Neonatal Exam') not null,
+    Diagnosis        varchar(255)                                                                               null,
+    Is_Contagious    tinyint(1)                                   default 0                                     not null,
+    Severity         enum ('Low', 'Moderate', 'High', 'Critical') default 'Low'                                 not null,
+    Treatment        varchar(255)                                                                               null,
+    Weight_kg        decimal(8, 2)                                                                              null,
+    Notes            text                                                                                       null,
+    constraint fk_health_animal
+        foreign key (Animal_ID) references Animal (Animal_ID)
+            on update cascade on delete cascade,
+    constraint fk_health_vet
+        foreign key (Vet_Employee_ID) references Veterinarian (Employee_ID)
+            on update cascade on delete set null
+);
+
+create index idx_health_animal_date
+    on Health_Record (Animal_ID, Exam_Date);
+
+create definer = avnadmin@`%` trigger trg_contagious_diagnosis
+    after insert
+    on Health_Record
+    for each row
+BEGIN
+    DECLARE v_name VARCHAR(100);
+    DECLARE v_enclosure INT;
+    DECLARE v_disease VARCHAR(255);
+    DECLARE v_vet INT;
+
+    IF NEW.Is_Contagious = 1 THEN
+        SET v_disease = COALESCE(NEW.Diagnosis, 'a contagious condition');
+        SET v_vet = COALESCE(NEW.Vet_Employee_ID, fn_least_busy_vet());
+
+        SELECT Animal_Name, Enclosure_ID INTO v_name, v_enclosure
+        FROM Animal WHERE Animal_ID = NEW.Animal_ID;
+
+        IF NOT EXISTS (SELECT 1 FROM Quarantine
+                       WHERE Animal_ID = NEW.Animal_ID AND Status IN ('Active', 'Extended')) THEN
+            INSERT INTO Quarantine (Animal_ID, Health_Record_ID, Start_Date, Expected_End_Date, Reason, Status)
+            VALUES (NEW.Animal_ID, NEW.Health_Record_ID, DATE(NEW.Exam_Date),
+                    DATE(NEW.Exam_Date) + INTERVAL 14 DAY, CONCAT('Contagious: ', v_disease), 'Active');
+        END IF;
+
+        UPDATE Animal
+        SET Public_Encounter_Eligible = 0, Health_Status = 'Quarantined'
+        WHERE Animal_ID = NEW.Animal_ID;
+
+        INSERT INTO Care_Task (Animal_ID, Enclosure_ID, Task_Category, Title, Description, Priority,
+                               Assigned_Employee_ID, Due_At, Source_Type, Source_ID)
+        VALUES (NEW.Animal_ID, v_enclosure, 'Veterinary',
+                CONCAT('Quarantine follow-up: ', v_name),
+                CONCAT('Re-examine for ', v_disease, '; decide whether to release or extend quarantine.'),
+                IF(NEW.Severity IN ('High', 'Critical'), 'Urgent', 'High'), v_vet,
+                NEW.Exam_Date + INTERVAL IF(NEW.Severity IN ('High', 'Critical'), 1, 3) DAY,
+                'Health_Record', NEW.Health_Record_ID);
+
+        INSERT INTO Care_Task (Animal_ID, Enclosure_ID, Task_Category, Title, Description, Priority,
+                               Assigned_Employee_ID, Due_At, Source_Type, Source_ID)
+        SELECT a.Animal_ID, v_enclosure, 'Veterinary',
+               CONCAT('Exposure screening: ', a.Animal_Name),
+               CONCAT('Shares an enclosure with ', v_name, ', diagnosed with ', v_disease, '.'),
+               'High', v_vet, NEW.Exam_Date + INTERVAL 2 DAY, 'Health_Record', NEW.Health_Record_ID
+        FROM Animal a
+        WHERE a.Enclosure_ID = v_enclosure
+          AND a.Animal_ID <> NEW.Animal_ID
+          AND a.Is_Active = 1;
+
+        CALL sp_notify_enclosure_keepers(v_enclosure, NEW.Animal_ID, 'Urgent',
+                                         CONCAT(v_name, ' is quarantined for ', v_disease,
+                                                '. Removed from public encounters. Use PPE and keep separated from enclosure-mates.'));
+    END IF;
+END;
+
+create table Quarantine
+(
+    Quarantine_ID     int auto_increment
+        primary key,
+    Animal_ID         int                                                      not null,
+    Health_Record_ID  int                                                      null,
+    Start_Date        date                                                     not null,
+    Expected_End_Date date                                                     null,
+    Actual_End_Date   date                                                     null,
+    Reason            varchar(255)                                             null,
+    Status            enum ('Active', 'Extended', 'Released') default 'Active' not null,
+    constraint fk_quarantine_animal
+        foreign key (Animal_ID) references Animal (Animal_ID)
+            on update cascade on delete cascade,
+    constraint fk_quarantine_record
+        foreign key (Health_Record_ID) references Health_Record (Health_Record_ID)
+            on delete set null
+);
+
+create index idx_quarantine_status
+    on Quarantine (Animal_ID, Status);
+
+create definer = avnadmin@`%` trigger trg_quarantine_released
+    before update
+    on Quarantine
+    for each row
+BEGIN
+    IF NEW.Status = 'Released' AND NOT (OLD.Status <=> 'Released') THEN
+        SET NEW.Actual_End_Date = COALESCE(NEW.Actual_End_Date, CURDATE());
+
+        IF NOT EXISTS (SELECT 1 FROM Quarantine
+                       WHERE Animal_ID = NEW.Animal_ID
+                         AND Quarantine_ID <> NEW.Quarantine_ID
+                         AND Status IN ('Active', 'Extended')) THEN
+            UPDATE Animal
+            SET Public_Encounter_Eligible = 1, Health_Status = 'Recovered'
+            WHERE Animal_ID = NEW.Animal_ID;
+
+            UPDATE Care_Task
+            SET Status = 'Cancelled', Completed_At = NOW()
+            WHERE Animal_ID = NEW.Animal_ID
+              AND Source_Type = 'Health_Record'
+              AND Source_ID = NEW.Health_Record_ID
+              AND Status IN ('Open', 'In Progress');
+
+            CALL sp_notify_enclosure_keepers(
+                    (SELECT Enclosure_ID FROM Animal WHERE Animal_ID = NEW.Animal_ID), NEW.Animal_ID, 'Info',
+                    CONCAT((SELECT Animal_Name FROM Animal WHERE Animal_ID = NEW.Animal_ID),
+                           ' has been released from quarantine and may return to public encounters.'));
+        END IF;
+    END IF;
+END;
+
+create table Volunteer
+(
+    Volunteer_ID     int auto_increment
+        primary key,
+    First_Name       varchar(50)  not null,
+    Last_Name        varchar(50)  not null,
+    Phone_Number     varchar(20)  null,
+    Email            varchar(100) null,
+    Start_Date       date         null,
+    End_Date         date         null,
+    Volunteer_Status varchar(50)  null,
+    Department_ID    int          null,
+    constraint volunteer_ibfk_1
+        foreign key (Department_ID) references Department (Department_ID)
+            on update cascade on delete set null
+);
+
+create index Department_ID
+    on Volunteer (Department_ID);
+
+create
+    definer = avnadmin@`%` function fn_least_busy_vet() returns int reads sql data
+BEGIN
+    DECLARE v_vet INT DEFAULT NULL;
+    SELECT v.Employee_ID INTO v_vet
+    FROM Veterinarian v
+             LEFT JOIN Care_Task t
+                       ON t.Assigned_Employee_ID = v.Employee_ID
+                           AND t.Status IN ('Open', 'In Progress')
+    GROUP BY v.Employee_ID
+    ORDER BY COUNT(t.Task_ID), v.Employee_ID
+    LIMIT 1;
+    RETURN v_vet;
+END;
+
+create
+    definer = avnadmin@`%` procedure sp_notify_enclosure_keepers(IN p_enclosure int, IN p_animal int,
+                                                                 IN p_priority varchar(20), IN p_message varchar(500))
+    modifies sql data
+BEGIN
+    INSERT INTO Staff_Notification (Employee_ID, Animal_ID, Enclosure_ID, Priority, Message)
+    SELECT DISTINCT ke.Employee_ID, p_animal, p_enclosure, p_priority, p_message
+    FROM Keeper_Enclosure ke
+    WHERE ke.Enclosure_ID = p_enclosure
+      AND (ke.Assignment_Start_Date IS NULL OR ke.Assignment_Start_Date <= CURDATE())
+      AND (ke.Assignment_End_Date IS NULL OR ke.Assignment_End_Date >= CURDATE());
+END;
+
