@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using MySqlConnector;
@@ -8,6 +9,7 @@ namespace ZooDatabase.Pages.Shop;
 // Stock levels for gift shop products, how fast they sell, and the restock order workflow:
 //   Draft -> Ordered -> Received (Tien's trigger adds the stock when an order is received)
 // Feed orders drafted automatically by the feeding triggers show up here too.
+[Authorize(Roles = "Admin,SuperUser,DBA")]
 public class InventoryModel : PageModel
 {
     private readonly IConfiguration _config;

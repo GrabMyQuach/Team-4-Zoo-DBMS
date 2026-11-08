@@ -18,7 +18,7 @@
         currentSection = match?.Slug ?? module.Sections[0].Slug;
     }
 
-    bool canSeeReports = User.IsInRole("SuperUser") || User.IsInRole("DBA");
+    
     bool canManageData = User.IsInRole("DBA") ||
                      User.IsInRole("SuperUser") ||
                      User.IsInRole("Admin");
@@ -33,8 +33,55 @@
                 {
                     foreach (var s in module.Sections)
                     {
-                        if (s.Slug == "Reports" && !canSeeReports) { continue; }
-                        if (module.Key == "Staff" && s.Slug == "EmployeeManage" && !canManageData){ continue; }
+                        // ReadOnly users cannot see sensitive sections.
+                        if (User.IsInRole("ReadOnly"))
+                        {
+                            // Hide Feed from ReadOnly users.
+                           if (User.IsInRole("ReadOnly") &&
+                               module.Key == "Animals" &&
+                               s.Slug == "Feed")
+                            {
+                               continue;
+                            }
+                            if (module.Key == "Shop" &&
+                               (s.Slug == "Inventory" ||
+                                s.Slug == "Suppliers" ||
+                                s.Slug == "Sales"))
+                            {
+                                continue;
+                            }
+
+                            if (module.Key == "Tickets" &&
+                               (s.Slug == "TicketSales" ||
+                                s.Slug == "Customers" ||
+                                s.Slug == "Memberships"))
+                            {
+                                continue;
+                            }
+                        }
+                        // Show only permitted sections to Cashiers.
+                        if (User.IsInRole("Cashier") &&
+                           s.Slug != "TicketSales" &&
+                           s.Slug != "TicketTypes" &&
+                           s.Slug != "Memberships")
+                       {
+                           continue;
+                       }
+
+                       // Hide management sections from unauthorized users.
+                       if (module.Key == "Staff" &&
+                          s.Slug == "EmployeeManage" &&
+                          !canManageData)
+                       {
+                          continue;
+                       }
+
+                      // Reports access follows the centralized role configuration.
+                       if (s.Slug == "Reports" &&
+                          !ReportAccess.CanView(User))
+                       {
+                          continue;
+                       }
 
                         var isActive = string.Equals(s.Slug, currentSection, StringComparison.OrdinalIgnoreCase);
                         <a class="nav-link @(isActive ? "active" : "")" href="/@module.Key/@s.Slug">@s.Title</a>
