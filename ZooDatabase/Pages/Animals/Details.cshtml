@@ -207,7 +207,13 @@
     <div class="col-lg-6">
         <div class="card h-100">
             <div class="card-body p-4">
-                <h2 class="h5 section-heading">Feeding</h2>
+                <div class="d-flex justify-content-between align-items-center">
+                    <h2 class="h5 section-heading">Feeding</h2>
+                    @if (Model.CanLogFeeding && Model.FeedingSchedule.Count > 0)
+                    {
+                        <a href="/Animals/FeedingNew/@Model.Animal.AnimalId" class="btn btn-sm btn-primary rounded-pill px-3">Log Feeding</a>
+                    }
+                </div>
                 @if (Model.FeedingSchedule.Count > 0)
                 {
                     <ul class="list-unstyled mb-0">

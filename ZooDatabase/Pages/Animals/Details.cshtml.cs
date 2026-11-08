@@ -30,6 +30,8 @@ public class DetailsModel : PageModel
     public bool CanEdit => AnimalOptions.CanEdit(User);
 
     public bool CanRecordHealth => AnimalOptions.CanRecordHealth(User);
+
+    public bool CanLogFeeding => AnimalOptions.CanLogFeeding(User);
     
     public async Task<IActionResult> OnGetAsync(int id)
     {
