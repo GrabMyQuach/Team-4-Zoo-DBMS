@@ -20,6 +20,16 @@ public static class AnimalOptions
     { "Routine Checkup", "Illness", "Injury", "Vaccination", "Follow-up", "Neonatal Exam" };
 
     public static readonly string[] Severities = { "Low", "Moderate", "High", "Critical" };
+
+    // Roles allowed to log feedings (Animals > Details > Log Feeding). Same roles as the Feed page.
+    public const string FeedingEditorRoles = "Zookeeper,Veterinarian,Admin,SuperUser,DBA";
+
+    public static bool CanLogFeeding(ClaimsPrincipal user) =>
+        FeedingEditorRoles.Split(',').Any(user.IsInRole);
+
+    // Must match the Status ENUM on Feeding_Log in the database
+    public static readonly string[] FeedingStatuses = { "Completed", "Partial", "Refused", "Missed" };
+
     // Dropdown choices, so staff pick from a list instead of typing
     public static readonly string[] Genders = { "Male", "Female", "Unknown" };
 

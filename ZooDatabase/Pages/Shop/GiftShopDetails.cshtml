@@ -1,3 +1,4 @@
 @page "{id:int}"
 @model ZooDatabase.Pages.Shop.GiftShopDetailsModel
+@{ ViewData["Title"] = Model.Outlet.Name; }
 <partial name="_OutletDetails" model="Model" />

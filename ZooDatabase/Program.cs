@@ -41,6 +41,9 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+// Show a friendly page (not a blank screen) for "not found", "bad request", etc.
+app.UseStatusCodePagesWithReExecute("/Error", "?code={0}");
+
 app.UseHttpsRedirection();
 app.UseRouting();
 

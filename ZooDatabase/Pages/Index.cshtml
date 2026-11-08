@@ -1,47 +1,94 @@
-
 @page
 @model IndexModel
-@using ZooDatabase.Data
-
 @{
     ViewData["Title"] = "Home";
+    var hour = DateTime.Now.Hour;
+    string greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 }
 
 <div class="border-bottom pb-3 mb-4">
-    <h1 class="mb-0 brand-title">Products</h1>
+    <h1 class="h2 mb-1">@greeting, @Model.DisplayName</h1>
+    <p class="text-muted mb-0">@DateTime.Today.ToString("dddd, MMMM d, yyyy") · Here's what needs attention today.</p>
 </div>
 
-<div class="row g-4">
-    @foreach (var m in ZooModules.All)
+@if (Model.Tiles.Count > 0)
+{
+    <div class="row g-3 mb-4">
+        @foreach (var t in Model.Tiles)
+        {
+            <div class="col-6 col-xl">
+                <a href="@t.Url" class="dash-tile tone-@t.Tone">
+                    <div class="dash-tile-label">@t.Label</div>
+                    <div class="dash-tile-value">@t.Value <span class="dash-tile-suffix">@t.Suffix</span></div>
+                    <div class="dash-tile-detail">@t.Detail</div>
+                </a>
+            </div>
+        }
+    </div>
+}
+
+@if (Model.ShowTasks)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="h5 section-heading mb-0">Open Care Tasks</h2>
+                <span class="text-muted small">@Model.OpenTaskCount open · most urgent first</span>
+            </div>
+            @if (Model.Tasks.Count == 0)
+            {
+                <p class="text-muted mb-0">No open tasks. Nice work.</p>
+            }
+            else
+            {
+                <table class="table align-middle mb-0">
+                    <thead class="table-light">
+                        <tr><th>Task</th><th>Animal</th><th class="d-none d-md-table-cell">Assigned to</th><th>Priority</th><th>Due</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var t in Model.Tasks)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@t.Title</td>
+                                <td>
+                                    @if (t.AnimalId != null)
+                                    {
+                                        <a href="/Animals/Details/@t.AnimalId" class="text-decoration-none">@t.AnimalName</a>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">—</span>
+                                    }
+                                </td>
+                                <td class="d-none d-md-table-cell">
+                                    @t.AssignedTo
+                                    @if (t.IsMine) { <span class="badge bg-success ms-1">You</span> }
+                                </td>
+                                <td>
+                                    <span class="badge @(t.Priority switch { "Urgent" => "bg-danger", "High" => "bg-warning text-dark", _ => "bg-light text-dark border" })">@t.Priority</span>
+                                </td>
+                                <td class="@(t.IsOverdue ? "text-danger fw-semibold" : "")">
+                                    @(t.DueAt?.ToString("MMM d, h:mm tt") ?? "—")
+                                    @if (t.IsOverdue) { <div class="small">Overdue</div> }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+}
+
+<h2 class="h5 section-heading">Go to</h2>
+<div class="row g-3">
+    @foreach (var m in Model.Modules)
     {
-        // Restrict modules based on the logged-in user's role
-        if (User.IsInRole("ReadOnly") &&
-            (m.Key == "Staff" || m.Key == "Finance"))
-        {
-            continue;
-        }
-
-        // Zookeeper and Veterinarian only see Animals
-        if ((User.IsInRole("Zookeeper") ||
-             User.IsInRole("Veterinarian")) &&
-            m.Key != "Animals")
-        {
-            continue;
-        }
-
-        // Cashier only sees the Tickets module
-        if (User.IsInRole("Cashier") &&
-            m.Key != "Tickets")
-        {
-            continue;
-        }
-
         <div class="col-sm-6 col-xl-3">
             <a href="/@m.Key" class="module-card">
-                <img src="/images/@m.Image"
-                     alt="@m.Title"
-                     class="module-card-img" />
+                <img src="/images/@m.Image" alt="" class="module-card-img" />
                 <div class="module-card-title">@m.Title</div>
+                <div class="module-card-desc">@m.Description</div>
             </a>
         </div>
     }

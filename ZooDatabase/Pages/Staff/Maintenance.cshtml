@@ -4,9 +4,18 @@
     ViewData["Title"] = "Maintenance";
 }
 
-<div class="border-bottom pb-3 mb-4">
+<div class="border-bottom pb-3 mb-4 d-flex justify-content-between align-items-center">
     <h1 class="h2 mb-0">Maintenance</h1>
+    @if (Model.CanEdit)
+    {
+        <a href="/Staff/MaintenanceEdit" class="btn btn-primary rounded-pill px-4">New Request</a>
+    }
 </div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
 
 <div class="d-flex gap-2 mb-3">
     <a href="/Staff/Maintenance?Show=open"
@@ -27,6 +36,10 @@
                     <th>Requested</th>
                     <th>Status</th>
                     <th class="text-end">Cost</th>
+                    @if (Model.CanEdit)
+                    {
+                        <th></th>
+                    }
                 </tr>
             </thead>
             <tbody>
@@ -53,13 +66,19 @@
                             }
                         </td>
                         <td class="text-end">@(m.Cost?.ToString("C") ?? "—")</td>
+                        @if (Model.CanEdit)
+                        {
+                            <td class="text-end">
+                                <a href="/Staff/MaintenanceEdit/@m.Id" class="btn btn-sm btn-outline-primary rounded-pill px-3">Update</a>
+                            </td>
+                        }
                     </tr>
                 }
 
                 @if (Model.Rows.Count == 0)
                 {
                     <tr>
-                        <td colspan="7" class="text-center text-muted py-4">No maintenance requests found.</td>
+                        <td colspan="@(Model.CanEdit ? 8 : 7)" class="text-center text-muted py-4">No maintenance requests found.</td>
                     </tr>
                 }
             </tbody>

@@ -194,3 +194,68 @@ header .btn {
 @media print { main .row > section { flex: 0 0 100%; max-width: 100%; } }
 .card > .card-body.pb-0 { flex-grow: 0; }
 .mini-bar { min-width: 100px; }
+/* ===== Page titles: every page uses the same green title ===== */
+main h1,
+main h1.h2,
+main h1.h3 {
+    color: #1f5f3f;
+    font-weight: 700;
+}
+
+/* ===== Wide tables scroll inside their card instead of getting cut off ===== */
+.card-body {
+    overflow-x: auto;
+}
+
+/* ===== Home dashboard tiles ===== */
+.dash-tile {
+    display: block;
+    height: 100%;
+    background: #fff;
+    border: 1px solid #e3e7e5;
+    border-left: 5px solid #1f5f3f;
+    border-radius: 12px;
+    padding: 16px 18px;
+    text-decoration: none;
+    color: inherit;
+    transition: transform .15s, box-shadow .15s;
+}
+.dash-tile:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,.07); color: inherit; }
+.dash-tile.tone-warn { border-left-color: #d89b1c; }
+.dash-tile.tone-bad { border-left-color: #c0392b; }
+.dash-tile-label { font-size: .85rem; color: #6c757d; }
+.dash-tile-value { font-size: 1.9rem; font-weight: 700; color: #1f5f3f; line-height: 1.2; margin-top: 4px; }
+.tone-warn .dash-tile-value { color: #9a6a00; }
+.tone-bad .dash-tile-value { color: #c0392b; }
+.dash-tile-suffix { font-size: 1rem; font-weight: 500; color: #6c757d; }
+.dash-tile-detail { font-size: .85rem; color: #495057; margin-top: 4px; }
+
+/* Home section cards: smaller now that the dashboard sits above them */
+.module-card { padding: 24px 20px; }
+.module-card-img { height: 110px; }
+.module-card-title { margin-top: 12px; }
+
+/* ===== Error page ===== */
+.error-code { font-size: 3.5rem; font-weight: 800; color: #1f5f3f; line-height: 1; opacity: .85; }
+
+/* ===== Phones: the sidebar becomes one scrollable row of tabs ===== */
+@media (max-width: 767.98px) {
+    .module-sidebar { padding: 10px 12px; }
+    .module-title { font-size: 1rem; margin-bottom: 6px; }
+    .module-sidebar .nav.flex-column {
+        flex-direction: row !important;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        gap: 4px;
+        scrollbar-width: none;
+    }
+    .module-sidebar .nav-link { white-space: nowrap; padding: 6px 12px; }
+    .main-menu .sub-nav { display: contents; }
+    .main-menu .nav-link.parent-active { display: none; }
+    .back-link { margin-top: 8px; }
+    header .navbar img { height: 44px !important; }
+    footer.footer { font-size: .8rem; }
+}
+
+/* Monthly trend bars can be narrower so all the columns fit */
+.trend-table .mini-bar { min-width: 40px; }

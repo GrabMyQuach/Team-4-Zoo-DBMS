@@ -10,6 +10,16 @@ public static class StaffOptions
 
     public static bool CanEdit(ClaimsPrincipal user) => user.IsInRole("DBA");
 
+    // Roles allowed to create and update maintenance requests (Staff > Maintenance).
+    public const string MaintenanceEditorRoles = "DBA,SuperUser,Admin";
+
+    public static bool CanEditMaintenance(ClaimsPrincipal user) =>
+        MaintenanceEditorRoles.Split(',').Any(user.IsInRole);
+
+    // These must match the database: the Priority ENUM and the chk_maintenance_status rule
+    public static readonly string[] MaintenancePriorities = { "Low", "Normal", "High", "Emergency" };
+    public static readonly string[] MaintenanceStatuses = { "Open", "Pending", "In Progress", "Completed", "Cancelled" };
+
     // Private details (SSN, pay, address, login) are only shown to these roles
     public static bool CanSeePrivate(ClaimsPrincipal user) => user.IsInRole("DBA") || user.IsInRole("SuperUser");
 
