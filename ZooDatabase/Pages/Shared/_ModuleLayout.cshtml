@@ -20,9 +20,52 @@
                 {
                     foreach (var s in module.Sections)
                     {
-                        if (s.Slug == "Reports" && !canSeeReports) { continue; }
+                        if (s.Title == "Reports" && !canSeeReports) { continue; }
                         if (module.Key == "Animals" && s.Slug == "Manage" && !canManageData) { continue; }
                         if (module.Key == "Staff" && s.Slug == "EmployeeManage" && !canManageData){ continue; }
+
+
+                        if (User.IsInRole("Cashier"))
+                        {
+                            if (module.Key != "Tickets" ||
+                               (s.Slug != "TicketSales" &&
+                                s.Slug != "TicketTypes" &&
+                                s.Slug != "Memberships"))
+                           {
+                                continue;
+                           }
+                        }
+
+                        
+                        if (User.IsInRole("ReadOnly"))
+                        {
+                        // Hide internal animal operations
+                            if (module.Key == "Animals" &&
+                               (s.Slug == "Manage" ||
+                                s.Slug == "Enclosures" ||
+                                s.Slug == "Feed"))
+                            {
+                                continue;
+                            }
+
+                        // Hide ticket sales and customer information
+                            if (module.Key == "Tickets" &&
+                               (s.Slug == "TicketSales" ||
+                                s.Slug == "Customers"))
+                            {
+                                continue;
+                            }
+
+                       // Hide internal shop operations
+                           if (module.Key == "Shop" &&
+                              (s.Slug == "Inventory" ||
+                               s.Slug == "Suppliers" ||
+                               s.Slug == "Sales"))
+                            {
+                               continue;
+                            }
+                        }
+
 
 
                         var isActive = string.Equals(s.Slug, currentSection, StringComparison.OrdinalIgnoreCase);

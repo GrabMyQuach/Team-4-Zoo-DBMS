@@ -7,7 +7,7 @@ using System.Data;
 
 namespace ZooDatabase.Pages.Staff;
 
-[Authorize(Roles = "DBA,SuperUser,Admin")]
+[Authorize(Roles = "SuperUser,Admin")]
 public class EmployeeManageModel : PageModel
 {
     private readonly IConfiguration _config;
@@ -102,6 +102,11 @@ private async Task LoadEmployeesAsync()
         string? PayType,
         decimal? PayRate)
     {
+        // Only Admin can add employees
+        if (!User.IsInRole("Admin"))
+        {
+            return Forbid();
+        }
         if (string.IsNullOrWhiteSpace(FirstName) ||
             string.IsNullOrWhiteSpace(LastName))
         {
@@ -231,10 +236,14 @@ private async Task LoadEmployeesAsync()
     
     public async Task<IActionResult> OnPostDeleteAsync(int id)
     {
+       if (!User.IsInRole("Admin"))
+       {
+           return Forbid();
+       }
        if (id <= 0)
-    {
-        return BadRequest();
-    }
+       {
+           return BadRequest();
+       }
 
         var connectionString =
            _config.GetConnectionString("ZooDb");

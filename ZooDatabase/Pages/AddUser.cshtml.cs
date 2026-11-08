@@ -15,7 +15,16 @@ public class AddUserModel : PageModel
         _config = config;
     }
 
-    public static readonly string[] Roles = { "ReadOnly", "Admin", "SuperUser", "DBA" };
+    public static readonly string[] Roles =
+    {
+        "ReadOnly",
+        "Zookeeper",
+        "Veterinarian",
+        "Cashier",
+        "Admin",
+        "SuperUser",
+        "DBA"
+    };
 
     [BindProperty] public string Username { get; set; } = "";
     [BindProperty] public string Password { get; set; } = "";

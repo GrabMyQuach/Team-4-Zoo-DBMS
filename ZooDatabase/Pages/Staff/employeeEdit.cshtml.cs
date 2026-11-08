@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace ZooDatabase.Pages.Staff;
 
-[Authorize(Roles = "DBA,SuperUser,Admin")]
+[Authorize(Roles = "Admin")]
 public class EmployeeEditModel : PageModel
 {
     private readonly IConfiguration _config;

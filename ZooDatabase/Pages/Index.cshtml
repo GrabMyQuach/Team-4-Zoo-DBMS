@@ -1,22 +1,55 @@
-﻿@page
+
+@page
 @model IndexModel
 @using ZooDatabase.Data
+
 @{
     ViewData["Title"] = "Home";
 }
 
 <div class="border-bottom pb-3 mb-4">
     <h1 class="mb-0 brand-title">ZooDatabase</h1>
-    <p class="text-muted mb-0 mt-1">Choose a section to get started.</p>
+    <p class="text-muted mb-0 mt-1">
+        Choose a section to get started.
+    </p>
 </div>
 
 <div class="row g-4">
     @foreach (var m in ZooModules.All)
     {
+        // Hide Staff and Finance from ReadOnly users
+        if (User.IsInRole("ReadOnly") &&
+            (m.Key == "Staff" || m.Key == "Finance"))
+        {
+            continue;
+        }
+        // Zookeepers should only see the Animals module
+        if (User.IsInRole("Zookeeper") && m.Key != "Animals")
+        {
+            continue;
+        }
+        // Veterinarians should only see Animals for now
+        if (User.IsInRole("Veterinarian") && m.Key != "Animals")
+        {
+            continue;
+        }
+        // Cashiers should only see Tickets & Memberships
+        if (User.IsInRole("Cashier") && m.Key != "Tickets")
+        {
+           
+            continue;
+           
+        }
+
         <div class="col-sm-6 col-lg-3">
             <a href="/@m.Key" class="module-card">
-                <img src="/images/@m.Image" alt="@m.Title" class="module-card-img" />
-                <div class="module-card-title">@m.Title</div>
+                <img src="/images/@m.Image"
+                     alt="@m.Title"
+                     class="module-card-img" />
+
+                <div class="module-card-title">
+                    @m.Title
+                </div>
             </a>
         </div>
     }

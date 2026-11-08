@@ -6,7 +6,7 @@ using MySqlConnector;
 
 namespace ZooDatabase.Pages.Animals;
 
-[Authorize(Roles = "DBA,SuperUser,Admin")]
+[Authorize(Roles = "SuperUser,Admin")]
 public class ManageModel : PageModel
 {
     private readonly IConfiguration _config;
@@ -93,6 +93,11 @@ public class ManageModel : PageModel
         DateTime? DateAcquired,
         string? AcquisitionType)
     {
+        // Only Admin can add animals
+        if (!User.IsInRole("Admin"))
+        {
+           return Forbid();
+        }
         // Validate required fields
         if (string.IsNullOrWhiteSpace(AnimalName) ||
             SpeciesId <= 0 || EnclosureId <= 0)
@@ -145,6 +150,10 @@ public class ManageModel : PageModel
     // POST: Soft delete an animal
     public async Task<IActionResult> OnPostDeleteAsync(int AnimalId)
     {
+        if (!User.IsInRole("Admin"))
+        {
+            return Forbid();
+        }
         if (AnimalId <= 0)
         {
             return BadRequest();
@@ -176,5 +185,3 @@ public class ManageModel : PageModel
 
 
 }
-
-

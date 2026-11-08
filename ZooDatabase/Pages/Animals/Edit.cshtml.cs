@@ -6,7 +6,7 @@ using MySqlConnector;
 
 namespace ZooDatabase.Pages.Animals;
 
-[Authorize(Roles = "DBA,SuperUser,Admin")]
+[Authorize(Roles = "Admin")]
 public class EditModel : PageModel
 {
     private readonly IConfiguration _config;

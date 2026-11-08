@@ -1,3 +1,4 @@
+
 using Microsoft.AspNetCore.Authentication.Cookies;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,12 +14,38 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.SlidingExpiration = true;
     });
 
-builder.Services.AddAuthorization();
+// 2. Define who can access Staff & Operations
+builder.Services.AddAuthorization(options =>
+{
+    // Both roles can view Staff & Operations
+    options.AddPolicy("StaffAccess", policy =>
+        policy.RequireRole("Admin", "SuperUser"));
 
-// 2. Every page requires login, except these
+    // Only Admin can modify operational records
+    options.AddPolicy("AdminManage", policy =>
+        policy.RequireRole("Admin"));
+
+    // SuperUser can access approved supervisory functions
+    options.AddPolicy("SuperUserAccess", policy =>
+        policy.RequireRole("SuperUser"));
+
+    // Only DBA can manage system accounts
+    options.AddPolicy("DBAAccess", policy =>
+        policy.RequireRole("DBA"));
+
+    // Existing veterinarian policy
+    options.AddPolicy("VeterinarianAccess", policy =>
+        policy.RequireRole("Veterinarian", "DBA", "SuperUser", "Admin"));
+});
+
+// 3. Every page requires login, except these
 builder.Services.AddRazorPages(options =>
 {
     options.Conventions.AuthorizeFolder("/");
+
+    // Protect all Staff pages
+    options.Conventions.AuthorizeFolder("/Staff", "StaffAccess");
+
     options.Conventions.AllowAnonymousToPage("/Login");
     options.Conventions.AllowAnonymousToPage("/AccessDenied");
     options.Conventions.AllowAnonymousToPage("/Error");
@@ -40,7 +67,7 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseRouting();
 
-// 3. Check who you are, then what you're allowed to do
+// 4. Check who you are, then what you're allowed to do
 app.UseAuthentication();
 app.UseAuthorization();
 
