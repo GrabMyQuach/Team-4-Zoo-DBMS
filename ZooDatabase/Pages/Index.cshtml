@@ -1,4 +1,4 @@
-﻿@page
+@page
 @model IndexModel
 @using ZooDatabase.Data
 @{
@@ -6,14 +6,13 @@
 }
 
 <div class="border-bottom pb-3 mb-4">
-    <h1 class="mb-0 brand-title">ZooDatabase</h1>
-    <p class="text-muted mb-0 mt-1">Choose a section to get started.</p>
+    <h1 class="mb-0 brand-title">Products</h1>
 </div>
 
 <div class="row g-4">
     @foreach (var m in ZooModules.All)
     {
-        <div class="col-sm-6 col-lg-3">
+        <div class="col-sm-6 col-xl-3">
             <a href="/@m.Key" class="module-card">
                 <img src="/images/@m.Image" alt="@m.Title" class="module-card-img" />
                 <div class="module-card-title">@m.Title</div>

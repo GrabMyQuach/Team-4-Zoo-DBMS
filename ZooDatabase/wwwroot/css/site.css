@@ -158,3 +158,37 @@ header .btn {
 .privacy h2:first-child {
     margin-top: 0;
 }
+   /* ===== Clickable rows + detail pages ===== */
+   .clickable-row { cursor: pointer; }
+   .section-heading { color: #1f5f3f; font-weight: 700; margin-bottom: 16px; }
+   .detail-list dt { font-weight: 500; color: #6c757d; }
+   .detail-list dd { margin-bottom: 10px; }
+/* ===== Summary cards ===== */
+.stat-card .stat-label { font-size: .85rem; color: #6c757d; }
+.stat-card .stat-value { font-size: 1.6rem; font-weight: 700; color: #1f5f3f; }
+/* ===== Reports ===== */
+.report-card { display:block; height:100%; background:#fff; border:1px solid #e3e7e5; border-radius:16px;
+  padding:24px; text-decoration:none; color:inherit; transition:transform .15s, box-shadow .15s; }
+.report-card:hover { transform:translateY(-4px); box-shadow:0 8px 24px rgba(0,0,0,.08); color:inherit; }
+.report-card-icon { font-size:40px; }
+.report-card-title { font-size:1.2rem; font-weight:700; color:#1f5f3f; margin-top:8px; }
+.report-card-question { color:#333; margin-top:6px; }
+.report-card-filters { font-size:.85rem; color:#6c757d; margin-top:10px; }
+.report-tabs .nav-link { color:#333; }
+.report-tabs .nav-link.active { color:#1f5f3f; font-weight:600; }
+
+/* ===== Print / Save as PDF ===== */
+.print-only { display:none; }
+@media print {
+  header, footer, .module-sidebar, .no-print { display:none !important; }
+  .print-only { display:block !important; }
+  * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  body { background:#fff !important; }
+  .card { box-shadow:none !important; break-inside:avoid; }
+}
+   .mini-bar { height: 8px; background: #eef3f0; border-radius: 4px; overflow: hidden; }
+   .mini-bar-fill { height: 100%; background: #1f5f3f; }
+.main-menu .sub-nav { margin: 2px 0 6px 12px; padding-left: 8px; border-left: 2px solid #e3e7e5; }
+.main-menu .sub-nav .nav-link { font-size: .95rem; padding: 6px 10px; }
+.main-menu .nav-link.parent-active { color: #1f5f3f; font-weight: 600; }
+@media print { main .row > section { flex: 0 0 100%; max-width: 100%; } }

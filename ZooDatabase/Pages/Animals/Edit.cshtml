@@ -1,84 +1,107 @@
-
-@page
+@page "{id:int?}"
 @model ZooDatabase.Pages.Animals.EditModel
-
+@using ZooDatabase.Data
 @{
-    ViewData["Title"] = "Edit Animal";
+    ViewData["Title"] = Model.IsNew ? "Add Animal" : "Edit " + Model.Input.Name;
+    string cancelUrl = Model.IsNew ? "/Animals/Animals" : $"/Animals/Details/{Model.Id}";
+
+    // If an old record has a value that isn't in our list, keep it as a choice so it isn't lost
+    string[] WithCurrent(string[] options, string? current) =>
+        string.IsNullOrEmpty(current) || options.Contains(current) ? options : options.Append(current).ToArray();
 }
 
-<div class="container mt-4">
+<a href="@cancelUrl" class="back-link mt-0 mb-3 d-inline-block">← Back</a>
 
-    <h1>Edit Animal</h1>
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">@(Model.IsNew ? "Add Animal" : "Edit " + Model.Input.Name)</h1>
+</div>
 
-    <form method="post">
+<div class="card" style="max-width: 760px;">
+    <div class="card-body p-4">
 
-        <input type="hidden" asp-for="Animal.AnimalId" />
+        @if (Model.ErrorMessage != null)
+        {
+            <div class="alert alert-danger py-2">@Model.ErrorMessage</div>
+        }
 
-        <div asp-validation-summary="All"
-             class="text-danger"></div>
+        <form method="post">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Name *</label>
+                    <input asp-for="Input.Name" class="form-control" placeholder="e.g. Simba" maxlength="100" />
+                </div>
 
-        <div class="mb-3">
-            <label class="form-label">Animal Name</label>
-            <input asp-for="Animal.AnimalName"
-                   class="form-control" required />
-        </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Species *</label>
+                    <select asp-for="Input.SpeciesId" class="form-select">
+                        <option value="0">Choose a species…</option>
+                        @foreach (var s in Model.SpeciesOptions)
+                        {
+                            <option value="@s.Id">@s.Label</option>
+                        }
+                    </select>
+                </div>
 
-        <div class="mb-3">
-            <label class="form-label">Species ID</label>
-            <input asp-for="Animal.SpeciesId"
-                   type="number" class="form-control" required />
-        </div>
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Enclosure *</label>
+                    <select asp-for="Input.EnclosureId" class="form-select">
+                        <option value="0">Choose an enclosure…</option>
+                        @foreach (var e in Model.EnclosureOptions)
+                        {
+                            <option value="@e.Id">@e.Label</option>
+                        }
+                    </select>
+                </div>
 
-        <div class="mb-3">
-            <label class="form-label">Enclosure ID</label>
-            <input asp-for="Animal.EnclosureId"
-                   type="number" class="form-control" required />
-        </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Sex</label>
+                    <select asp-for="Input.Gender" class="form-select">
+                        <option value="">Not recorded</option>
+                        @foreach (var g in WithCurrent(AnimalOptions.Genders, Model.Input.Gender))
+                        {
+                            <option value="@g">@g</option>
+                        }
+                    </select>
+                </div>
 
-        <div class="mb-3">
-            <label class="form-label">Gender</label>
-            <select asp-for="Animal.Gender" class="form-select">
-                <option value="">Select Gender</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Unknown">Unknown</option>
-            </select>
-        </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Health status</label>
+                    <select asp-for="Input.HealthStatus" class="form-select">
+                        @foreach (var h in WithCurrent(AnimalOptions.HealthStatuses, Model.Input.HealthStatus))
+                        {
+                            <option value="@h">@h</option>
+                        }
+                    </select>
+                </div>
 
-        <div class="mb-3">
-            <label class="form-label">Date of Birth</label>
-            <input asp-for="Animal.DateOfBirth"
-                   type="date" asp-format="{0:yyyy-MM-dd}"
-                   class="form-control" />
-        </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Date of birth</label>
+                    <input asp-for="Input.DateOfBirth" type="date" class="form-control" />
+                </div>
 
-        <div class="mb-3">
-            <label class="form-label">Health Status</label>
-            <input asp-for="Animal.HealthStatus"
-                   class="form-control" />
-        </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Arrived at zoo</label>
+                    <input asp-for="Input.DateAcquired" type="date" class="form-control" />
+                </div>
 
-        <div class="mb-3">
-            <label class="form-label">Date Acquired</label>
-            <input asp-for="Animal.DateAcquired"
-                   type="date" asp-format="{0:yyyy-MM-dd}"
-                   class="form-control" />
-        </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">How acquired</label>
+                    <select asp-for="Input.AcquisitionType" class="form-select">
+                        <option value="">Not recorded</option>
+                        @foreach (var t in WithCurrent(AnimalOptions.AcquisitionTypes, Model.Input.AcquisitionType))
+                        {
+                            <option value="@t">@t</option>
+                        }
+                    </select>
+                </div>
+            </div>
 
-        <div class="mb-3">
-            <label class="form-label">Acquisition Type</label>
-            <input asp-for="Animal.AcquisitionType"
-                   class="form-control" />
-        </div>
-
-        <button type="submit" class="btn btn-success">
-            Save Changes
-        </button>
-
-        <a asp-page="./Manage" class="btn btn-secondary">
-            Cancel
-        </a>
-
-    </form>
-
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-primary rounded-pill px-4">
+                    @(Model.IsNew ? "Add Animal" : "Save Changes")
+                </button>
+                <a href="@cancelUrl" class="btn btn-outline-secondary rounded-pill px-4">Cancel</a>
+            </div>
+        </form>
+    </div>
 </div>

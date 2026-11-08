@@ -12,11 +12,9 @@ public static class ZooModules
         new("Animals", "Animals", "🦁","card-animals.png", "Animals, species, enclosures, and feeding", new ModuleSection[]
         {
             new("Animals", "Animals"),
-            new("Manage Animals", "Manage"),
             new("Species", "Species"),
             new("Enclosures", "Enclosures"),
-            new("Feed", "Feed"),
-            new("Reports", "animalreports")
+            new("Feed", "Feed")
         }),
 
         new("Staff", "Staff & Operations", "👷","card-staff.png", "Employees, departments, and maintenance", new ModuleSection[]
@@ -26,8 +24,7 @@ public static class ZooModules
             new("Departments", "Departments"),
             new("Keepers", "Keepers"),
             new("Veterinarians", "Veterinarians"),
-            new("Maintenance", "Maintenance"),
-            new("Reports", "employeereports")
+            new("Maintenance", "Maintenance")
         }),
 
         new("Tickets", "Tickets & Memberships", "🎟️","card-tickets.webp", "Ticket sales, customers, and attractions", new ModuleSection[]
@@ -36,8 +33,7 @@ public static class ZooModules
             new("Ticket Types", "TicketTypes"),
             new("Customers", "Customers"),
             new("Memberships", "Memberships"),
-            new("Attractions", "Attractions"),
-            new("Reports", "Reports")
+            new("Attractions", "Attractions")
         }),
 
         new("Shop", "Food & Gift Shop", "🛍️","card-shop.png", "Food stands, gift shops, inventory, and sales", new ModuleSection[]
@@ -48,8 +44,7 @@ public static class ZooModules
             new("Products", "Products"),
             new("Inventory", "Inventory"),
             new("Suppliers", "Suppliers"),
-            new("Sales", "Sales"),
-            new("Reports", "Reports")
+            new("Sales", "Sales")
         })
     };
 

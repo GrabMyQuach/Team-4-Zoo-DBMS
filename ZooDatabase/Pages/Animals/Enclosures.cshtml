@@ -1,53 +1,133 @@
 @page
 @model ZooDatabase.Pages.Animals.EnclosuresModel
+@using ZooDatabase.Pages.Animals
 @{
     ViewData["Title"] = "Enclosures";
+    bool filtered = !string.IsNullOrWhiteSpace(Model.Search) || !string.IsNullOrWhiteSpace(Model.Status) || !string.IsNullOrWhiteSpace(Model.Type);
 }
 
 <div class="border-bottom pb-3 mb-4">
     <h1 class="h2 mb-0">Enclosures</h1>
 </div>
 
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 mb-0">@Model.Rows.Count enclosures</h2>
+    @if (Model.CanEdit)
+    {
+        <a href="/Animals/EnclosureEdit" class="btn btn-primary rounded-pill px-4">+ Add Enclosure</a>
+    }
+</div>
+
 <div class="card">
+    <div class="card-body border-bottom">
+        <form method="get" class="row g-2 align-items-center">
+            <div class="col-md-5">
+                <input type="text" name="Search" value="@Model.Search" class="form-control" placeholder="Search name or location" />
+            </div>
+            <div class="col-md-3">
+                <select name="Type" class="form-select">
+                    <option value="">All types</option>
+                    @foreach (var t in Model.Types)
+                    {
+                        <option value="@t" selected="@(Model.Type == t)">@t</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select name="Status" class="form-select">
+                    <option value="">All statuses</option>
+                    @foreach (var s in EnclosuresModel.Statuses)
+                    {
+                        <option value="@s" selected="@(Model.Status == s)">@s</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-outline-secondary rounded-pill px-3">Filter</button>
+                @if (filtered)
+                {
+                    <a href="/Animals/Enclosures" class="btn btn-link px-1">Clear</a>
+                }
+            </div>
+        </form>
+    </div>
+
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
             <thead class="table-light">
                 <tr>
                     <th>Enclosure</th>
-                    <th>Type</th>
-                    <th>Location</th>
-                    <th style="width: 220px;">Occupancy</th>
+                    <th>Status</th>
+                    <th style="width: 180px;">Occupancy</th>
+                    <th>Keepers</th>
+                    <th>Needs Attention</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var e in Model.Rows)
                 {
-                    var percent = e.Capacity > 0 ? Math.Min(100, e.AnimalCount * 100 / e.Capacity) : 0;
-                    var full = e.AnimalCount >= e.Capacity;
-                    <tr>
-                        <td class="fw-semibold">@e.Name</td>
-                        <td>@e.Type</td>
-                        <td>@e.Location</td>
+                    var percent = e.Capacity > 0 ? Math.Min(100, e.Animals * 100 / e.Capacity) : 0;
+                    var full = e.Animals >= e.Capacity;
+                    <tr class="clickable-row" onclick="location.href='/Animals/EnclosureDetails/@e.Id'">
                         <td>
-                            <div class="small mb-1">
-                                @e.AnimalCount / @e.Capacity
-                                @if (full)
+                            <a href="/Animals/EnclosureDetails/@e.Id" class="fw-semibold text-decoration-none text-dark">@e.Name</a>
+                            <div class="small text-muted">
+                                @e.Type
+                                @if (e.Location != null)
                                 {
-                                    <span class="badge bg-danger ms-1">Full</span>
+                                    <span>· @e.Location</span>
                                 }
                             </div>
+                        </td>
+                        <td><span class="badge @EnclosuresModel.StatusBadge(e.Status)">@e.Status</span></td>
+                        <td>
+                            <div class="small mb-1">@e.Animals / @e.Capacity</div>
                             <div class="progress" style="height: 6px;">
-                                <div class="progress-bar @(full ? "bg-danger" : "bg-success")"
-                                     style="width: @percent%;"></div>
+                                <div class="progress-bar @(full ? "bg-danger" : "bg-success")" style="width: @percent%;"></div>
                             </div>
                         </td>
+                        <td>
+                            @if (e.Keepers == 0)
+                            {
+                                <span class="badge bg-danger">None assigned</span>
+                            }
+                            else
+                            {
+                                <span>@e.Keepers</span>
+                            }
+                        </td>
+                        <td>
+                            @if (e.NotHealthy > 0)
+                            {
+                                <span class="badge bg-warning text-dark me-1">@e.NotHealthy not healthy</span>
+                            }
+                            @if (e.OpenMaintenance > 0)
+                            {
+                                <span class="badge bg-warning text-dark me-1">@e.OpenMaintenance @(e.OpenMaintenance == 1 ? "repair" : "repairs")</span>
+                            }
+                            @if (e.LastInspection == "Critical")
+                            {
+                                <span class="badge bg-danger me-1">Failed inspection</span>
+                            }
+                            @if (e.NotHealthy == 0 && e.OpenMaintenance == 0 && e.LastInspection != "Critical")
+                            {
+                                <span class="text-muted small">All good</span>
+                            }
+                        </td>
+                        <td class="text-end text-muted">›</td>
                     </tr>
                 }
 
                 @if (Model.Rows.Count == 0)
                 {
                     <tr>
-                        <td colspan="4" class="text-center text-muted py-4">No enclosures found.</td>
+                        <td colspan="6" class="text-center text-muted py-4">No enclosures found.</td>
                     </tr>
                 }
             </tbody>

@@ -1,0 +1,401 @@
+@page "{id:int}"
+@model ZooDatabase.Pages.Animals.DetailsModel
+@using ZooDatabase.Data
+@using ZooDatabase.Pages.Animals
+@{
+    var a = Model.Animal;
+    ViewData["Title"] = a.Name;
+}
+
+<a href="/Animals/Animals" class="back-link mt-0 mb-3 d-inline-block">← All animals</a>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+
+<!-- Header: name, species, health, and staff buttons -->
+<div class="border-bottom pb-3 mb-4 d-flex flex-wrap justify-content-between align-items-end gap-3">
+    <div>
+        <h1 class="h2 mb-1">
+            @a.Name
+            @if (a.HealthStatus != null)
+            {
+                <span class="badge fs-6 align-middle @AnimalOptions.HealthBadgeClass(a.HealthStatus)">@a.HealthStatus</span>
+            }
+        </h1>
+        <div class="text-muted">
+            @a.Species
+            @if (a.ScientificName != null)
+            {
+                <span class="fst-italic">(@a.ScientificName)</span>
+            }
+        </div>
+    </div>
+
+    @if (Model.CanEdit)
+    {
+        <div class="d-flex gap-2">
+            <a href="/Animals/Edit/@a.AnimalId" class="btn btn-primary rounded-pill px-4">Edit</a>
+            <form method="post" asp-page-handler="Remove" asp-route-id="@a.AnimalId"
+                  onsubmit="return confirm('Remove this animal from the zoo records?');">
+                <button type="submit" class="btn btn-outline-danger rounded-pill px-4">Remove</button>
+            </form>
+        </div>
+    }
+</div>
+
+<!-- Alerts: anything staff need to notice right away -->
+@if (Model.ActiveQuarantine != null)
+{
+    var q = Model.ActiveQuarantine;
+    <div class="alert alert-danger">
+        <strong>In quarantine</strong> since @q.StartDate.ToString("MMM d, yyyy")
+        @if (q.ExpectedEnd != null)
+        {
+            <span>· expected release @q.ExpectedEnd.Value.ToString("MMM d, yyyy")</span>
+        }
+        @if (q.Reason != null)
+        {
+            <div class="small mt-1">Reason: @q.Reason</div>
+        }
+    </div>
+}
+@if (a.NeedsRelocation)
+{
+    <div class="alert alert-warning"><strong>Needs relocation.</strong> This animal's enclosure has a safety issue.</div>
+}
+@if (!a.EncounterEligible)
+{
+    <div class="alert alert-warning"><strong>Suspended from public encounters</strong> until cleared by a vet.</div>
+}
+
+<div class="row g-4">
+    <!-- Basic facts -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-body p-4">
+                <h2 class="h5 section-heading">Animal Info</h2>
+                <dl class="row detail-list mb-0">
+                    <dt class="col-sm-5">Sex</dt>
+                    <dd class="col-sm-7">@(a.Gender ?? "Unknown")</dd>
+
+                    <dt class="col-sm-5">Age</dt>
+                    <dd class="col-sm-7">
+                        @AnimalOptions.AgeText(a.DateOfBirth)
+                        @if (a.DateOfBirth != null)
+                        {
+                            <span class="text-muted small">(born @a.DateOfBirth.Value.ToString("MMM d, yyyy"))</span>
+                        }
+                    </dd>
+
+                    <dt class="col-sm-5">Arrived at zoo</dt>
+                    <dd class="col-sm-7">@(a.DateAcquired?.ToString("MMM d, yyyy") ?? "Unknown")</dd>
+
+                    <dt class="col-sm-5">How acquired</dt>
+                    <dd class="col-sm-7">@(a.AcquisitionType ?? "Unknown")</dd>
+
+                    <dt class="col-sm-5">Parents</dt>
+                    <dd class="col-sm-7">
+                        @if (a.MotherId == null && a.FatherId == null)
+                        {
+                            <span>Not recorded</span>
+                        }
+                        else
+                        {
+                            if (a.MotherId != null)
+                            {
+                                <div>Mother: <a href="/Animals/Details/@a.MotherId">@a.MotherName</a></div>
+                            }
+                            if (a.FatherId != null)
+                            {
+                                <div>Father: <a href="/Animals/Details/@a.FatherId">@a.FatherName</a></div>
+                            }
+                        }
+                    </dd>
+
+                    <dt class="col-sm-5">Public encounters</dt>
+                    <dd class="col-sm-7">@(a.EncounterEligible ? "Allowed" : "Suspended")</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <!-- Species + conservation -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-body p-4">
+                <h2 class="h5 section-heading">Species & Conservation</h2>
+                <dl class="row detail-list mb-0">
+                    <dt class="col-sm-5">Diet</dt>
+                    <dd class="col-sm-7">@(a.DietType ?? "—")</dd>
+
+                    <dt class="col-sm-5">Natural habitat</dt>
+                    <dd class="col-sm-7">@(a.HabitatType ?? "—")</dd>
+
+                    <dt class="col-sm-5">Conservation status</dt>
+                    <dd class="col-sm-7">
+                        @if (a.ConservationStatus != null)
+                        {
+                            <span class="badge bg-light text-dark border">@a.ConservationStatus</span>
+                        }
+                        else
+                        {
+                            <span>—</span>
+                        }
+                    </dd>
+
+                    <dt class="col-sm-5">Breeding program</dt>
+                    <dd class="col-sm-7">
+                        @if (Model.Conservation == null)
+                        {
+                            <span>Not enrolled</span>
+                        }
+                        else
+                        {
+                            <span>@(Model.Conservation.ProgramName ?? "Enrolled")</span>
+                            <span class="badge bg-success ms-1">@Model.Conservation.Status</span>
+                            if (Model.Conservation.StudbookNumber != null)
+                            {
+                                <div class="small text-muted">Studbook #@Model.Conservation.StudbookNumber</div>
+                            }
+                        }
+                    </dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <!-- Where it lives -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-body p-4">
+                <h2 class="h5 section-heading">Enclosure</h2>
+                <div class="fw-semibold fs-5">
+                    <a href="/Animals/EnclosureDetails/@a.EnclosureId" class="text-decoration-none">@a.Enclosure</a>
+                    @if (a.EnclosureStatus != "Open")
+                    {
+                        <span class="badge bg-danger fs-6 align-middle">@a.EnclosureStatus</span>
+                    }
+                </div>
+                <div class="text-muted mb-3">
+                    @a.EnclosureType
+                    @if (a.EnclosureLocation != null)
+                    {
+                        <span>· @a.EnclosureLocation</span>
+                    }
+                </div>
+                @{
+                    var percent = a.EnclosureCapacity > 0 ? Math.Min(100, Model.Enclosemates * 100 / a.EnclosureCapacity) : 0;
+                    var full = Model.Enclosemates >= a.EnclosureCapacity;
+                }
+                <div class="small mb-1">
+                    @Model.Enclosemates of @a.EnclosureCapacity spots filled
+                    @if (full)
+                    {
+                        <span class="badge bg-danger ms-1">Full</span>
+                    }
+                </div>
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar @(full ? "bg-danger" : "bg-success")" style="width: @percent%;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feeding -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-body p-4">
+                <h2 class="h5 section-heading">Feeding</h2>
+                @if (Model.FeedingSchedule.Count > 0)
+                {
+                    <ul class="list-unstyled mb-0">
+                        @foreach (var f in Model.FeedingSchedule)
+                        {
+                            <li class="border-bottom py-2">
+                                <div class="d-flex justify-content-between">
+                                    <span>
+                                        <strong>@DateTime.Today.Add(f.Time).ToString("h:mm tt")</strong>
+                                        · @f.FeedName (@f.Quantity.ToString("0.##") @f.Unit)
+                                    </span>
+                                    @if (f.TodayStatus == "Completed")
+                                    {
+                                        <span class="badge bg-success">Fed today</span>
+                                    }
+                                    else if (f.TodayStatus == "Missed" || f.TodayStatus == "Refused")
+                                    {
+                                        <span class="badge bg-danger">@f.TodayStatus today</span>
+                                    }
+                                    else if (f.TodayStatus != null)
+                                    {
+                                        <span class="badge bg-warning text-dark">@f.TodayStatus today</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-light text-dark border">Not logged</span>
+                                    }
+                                </div>
+                                <div class="small text-muted">
+                                    @(f.Keeper ?? "No keeper assigned")
+                                    @if (f.Instructions != null)
+                                    {
+                                        <span>· @f.Instructions</span>
+                                    }
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+                else if (Model.SpeciesDiet.Count > 0)
+                {
+                    <p class="small text-muted mb-2">No feeding schedule yet. Typical daily diet for this species:</p>
+                    <ul class="list-unstyled mb-0">
+                        @foreach (var d in Model.SpeciesDiet)
+                        {
+                            <li class="d-flex justify-content-between border-bottom py-2">
+                                <span>@d.FeedName</span>
+                                <span class="text-muted">@(d.DailyQuantity?.ToString("0.##") ?? "—") @d.Unit / day</span>
+                            </li>
+                        }
+                    </ul>
+                }
+                else
+                {
+                    <p class="text-muted mb-0">No feeding information recorded.</p>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Open tasks -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body p-4">
+                <h2 class="h5 section-heading">Open Care Tasks</h2>
+                @if (Model.OpenTasks.Count == 0)
+                {
+                    <p class="text-muted mb-0">No open tasks.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Task</th>
+                                    <th>Type</th>
+                                    <th>Priority</th>
+                                    <th>Assigned To</th>
+                                    <th>Due</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var t in Model.OpenTasks)
+                                {
+                                    <tr>
+                                        <td class="fw-semibold">@t.Title</td>
+                                        <td>@t.Category</td>
+                                        <td><span class="badge @DetailsModel.PriorityBadge(t.Priority)">@t.Priority</span></td>
+                                        <td>@(t.AssignedTo ?? "Unassigned")</td>
+                                        <td>@(t.DueAt?.ToString("MMM d, h:mm tt") ?? "—")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Health history -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body p-4">
+                <h2 class="h5 section-heading">Health History</h2>
+                @if (Model.HealthHistory.Count == 0)
+                {
+                    <p class="text-muted mb-0">No vet records yet.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Diagnosis</th>
+                                    <th>Severity</th>
+                                    <th>Treatment</th>
+                                    <th>Weight</th>
+                                    <th>Vet</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var h in Model.HealthHistory)
+                                {
+                                    <tr>
+                                        <td>@h.ExamDate.ToString("MMM d, yyyy")</td>
+                                        <td>@h.RecordType</td>
+                                        <td>
+                                            @(h.Diagnosis ?? "—")
+                                            @if (h.IsContagious)
+                                            {
+                                                <span class="badge bg-danger ms-1">Contagious</span>
+                                            }
+                                        </td>
+                                        <td><span class="badge @DetailsModel.SeverityBadge(h.Severity)">@h.Severity</span></td>
+                                        <td>@(h.Treatment ?? "—")</td>
+                                        <td>@(h.WeightKg != null ? h.WeightKg.Value.ToString("0.#") + " kg" : "—")</td>
+                                        <td>@(h.Vet ?? "—")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Care team -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body p-4">
+                <h2 class="h5 section-heading">Care Team</h2>
+                @if (Model.CareTeam.Count == 0)
+                {
+                    <p class="text-muted mb-0">No staff assigned to this animal yet.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Job</th>
+                                    <th>Role with this animal</th>
+                                    <th>Phone</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var c in Model.CareTeam)
+                                {
+                                    <tr>
+                                        <td class="fw-semibold">@c.Name</td>
+                                        <td>@c.JobPosition</td>
+                                        <td>@c.AssignedRole</td>
+                                        <td>@c.Phone</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>

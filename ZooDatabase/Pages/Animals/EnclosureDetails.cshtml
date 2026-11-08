@@ -1,0 +1,238 @@
+@page "{id:int}"
+@model ZooDatabase.Pages.Animals.EnclosureDetailsModel
+@using ZooDatabase.Data
+@using ZooDatabase.Pages.Animals
+@{
+    var e = Model.Enclosure;
+    ViewData["Title"] = e.Name;
+    var count = Model.Residents.Count;
+    var percent = e.Capacity > 0 ? Math.Min(100, count * 100 / e.Capacity) : 0;
+    var full = count >= e.Capacity;
+}
+
+<a href="/Animals/Enclosures" class="back-link mt-0 mb-3 d-inline-block">← All enclosures</a>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+
+<!-- Header -->
+<div class="border-bottom pb-3 mb-4 d-flex flex-wrap justify-content-between align-items-end gap-3">
+    <div>
+        <h1 class="h2 mb-1">
+            @e.Name
+            <span class="badge fs-6 align-middle @EnclosuresModel.StatusBadge(e.Status)">@e.Status</span>
+        </h1>
+        <div class="text-muted">
+            @e.Type
+            @if (e.Location != null)
+            {
+                <span>· @e.Location</span>
+            }
+        </div>
+    </div>
+    @if (Model.CanEdit)
+    {
+        <a href="/Animals/EnclosureEdit/@e.Id" class="btn btn-primary rounded-pill px-4">Edit</a>
+    }
+</div>
+
+@if (e.Status != "Open")
+{
+    <div class="alert alert-warning">
+        <strong>This enclosure is @e.Status.ToLower().</strong>
+        @if (e.ClosedReason != null)
+        {
+            <span>Reason: @e.ClosedReason</span>
+        }
+        @if (e.StatusChangedAt != null)
+        {
+            <div class="small">Since @e.StatusChangedAt.Value.ToString("MMM d, yyyy h:mm tt")</div>
+        }
+    </div>
+}
+@if (Model.Keepers.Count == 0)
+{
+    <div class="alert alert-danger"><strong>No keeper assigned.</strong> Nobody is currently responsible for this enclosure.</div>
+}
+
+<!-- Summary cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Occupancy</div>
+            <div class="stat-value">@count / @e.Capacity</div>
+            <div class="progress mt-2" style="height: 6px;">
+                <div class="progress-bar @(full ? "bg-danger" : "bg-success")" style="width: @percent%;"></div>
+            </div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Keepers on duty</div>
+            <div class="stat-value">@Model.Keepers.Count</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Open repairs</div>
+            <div class="stat-value @(Model.OpenRepairs.Count > 0 ? "text-warning" : "")">@Model.OpenRepairs.Count</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Last inspection</div>
+            @if (Model.Inspections.Count == 0)
+            {
+                <div class="stat-value text-muted">—</div>
+            }
+            else
+            {
+                <div class="stat-value"><span class="badge @EnclosureDetailsModel.ResultBadge(Model.Inspections[0].Result)">@Model.Inspections[0].Result</span></div>
+                <div class="small text-muted">@Model.Inspections[0].Date.ToString("MMM d, yyyy")</div>
+            }
+        </div></div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Residents -->
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-body p-4">
+                <h2 class="h5 section-heading">Animals Living Here</h2>
+                @if (count == 0)
+                {
+                    <p class="text-muted mb-0">No animals in this enclosure.</p>
+                }
+                else
+                {
+                    <table class="table table-hover align-middle mb-0">
+                        <tbody>
+                            @foreach (var a in Model.Residents)
+                            {
+                                <tr class="clickable-row" onclick="location.href='/Animals/Details/@a.AnimalId'">
+                                    <td><a href="/Animals/Details/@a.AnimalId" class="fw-semibold text-decoration-none text-dark">@a.Name</a></td>
+                                    <td>@a.Species</td>
+                                    <td>@a.Gender</td>
+                                    <td>
+                                        @if (a.HealthStatus != null)
+                                        {
+                                            <span class="badge @AnimalOptions.HealthBadgeClass(a.HealthStatus)">@a.HealthStatus</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Keepers -->
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-body p-4">
+                <h2 class="h5 section-heading">Keepers</h2>
+                @if (Model.Keepers.Count == 0)
+                {
+                    <p class="text-muted mb-0">None assigned.</p>
+                }
+                else
+                {
+                    <ul class="list-unstyled mb-0">
+                        @foreach (var k in Model.Keepers)
+                        {
+                            <li class="border-bottom py-2">
+                                <div class="fw-semibold">@k.Name</div>
+                                <div class="small text-muted">
+                                    @(k.Experience ?? "Keeper")
+                                    @if (k.Since != null)
+                                    {
+                                        <span>· since @k.Since.Value.ToString("MMM yyyy")</span>
+                                    }
+                                    @if (k.Phone != null)
+                                    {
+                                        <span>· @k.Phone</span>
+                                    }
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Open repairs -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body p-4">
+                <h2 class="h5 section-heading">Open Maintenance</h2>
+                @if (Model.OpenRepairs.Count == 0)
+                {
+                    <p class="text-muted mb-0">No open repairs.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0">
+                            <thead class="table-light">
+                                <tr><th>Issue</th><th>Priority</th><th>Status</th><th>Requested</th><th>Assigned To</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var m in Model.OpenRepairs)
+                                {
+                                    <tr>
+                                        <td>@m.Description</td>
+                                        <td><span class="badge @EnclosureDetailsModel.PriorityBadge(m.Priority)">@m.Priority</span></td>
+                                        <td>@(m.Status ?? "Open")</td>
+                                        <td>@(m.Requested?.ToString("MMM d, yyyy") ?? "—")</td>
+                                        <td>@(m.AssignedTo ?? "Unassigned")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Inspections -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body p-4">
+                <h2 class="h5 section-heading">Recent Inspections</h2>
+                @if (Model.Inspections.Count == 0)
+                {
+                    <p class="text-muted mb-0">No inspections recorded.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0">
+                            <thead class="table-light">
+                                <tr><th>Date</th><th>Result</th><th>Issue</th><th>Findings</th><th>Inspector</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var i in Model.Inspections)
+                                {
+                                    <tr>
+                                        <td>@i.Date.ToString("MMM d, yyyy")</td>
+                                        <td><span class="badge @EnclosureDetailsModel.ResultBadge(i.Result)">@i.Result</span></td>
+                                        <td>@i.Category</td>
+                                        <td>@(i.Findings ?? "—")</td>
+                                        <td>@(i.Inspector ?? "—")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>

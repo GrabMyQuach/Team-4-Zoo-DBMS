@@ -1,0 +1,20 @@
+@model ZooDatabase.Pages.Reports.ReportPageModel
+@{
+    // Title and the Excel / PDF buttons, shared by every report
+    var title = (string)ViewData["ReportTitle"]!;
+    var filters = ViewData["ReportFilters"] as string;
+}
+<div class="border-bottom pb-3 mb-4 d-flex flex-wrap justify-content-between align-items-end gap-3">
+    <div>
+        <h1 class="mb-0 brand-title">@title</h1>
+    </div>
+    <div class="d-flex gap-2 no-print">
+        <a href="@Model.ExcelUrl" class="btn btn-outline-primary rounded-pill px-4">Download Excel</a>
+        <button type="button" onclick="window.print()" class="btn btn-outline-primary rounded-pill px-4">Save as PDF</button>
+    </div>
+</div>
+
+<div class="print-only mb-3 small text-muted">
+    Generated @DateTime.Now.ToString("MMM d, yyyy h:mm tt") by @User.Identity?.Name ·
+    <span>@Model.DateRangeText</span>@(string.IsNullOrEmpty(filters) ? "" : " · " + filters)
+</div>

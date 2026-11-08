@@ -1,0 +1,49 @@
+@using ZooDatabase.Data
+@{
+    // Left "Main menu" (like CPOMS): Products, Reports, Admin.
+    // Each user only sees the items their role can open.
+    var path = (Context.Request.Path.Value ?? "/").TrimEnd('/');
+    if (path == "") { path = "/"; }
+
+    bool inReports = path.StartsWith("/Reports", StringComparison.OrdinalIgnoreCase);
+    bool inAdmin = path.StartsWith("/ManageUsers", StringComparison.OrdinalIgnoreCase)
+                || path.StartsWith("/AddUser", StringComparison.OrdinalIgnoreCase)
+                || path.StartsWith("/EditUser", StringComparison.OrdinalIgnoreCase);
+    bool inProducts = path == "/" || path.Equals("/Index", StringComparison.OrdinalIgnoreCase);
+
+    var reportLinks = new (string Url, string Title, string Roles)[]
+    {
+        ("/Reports", "Overview", ReportAccess.AnyReport),
+        ("/Reports/AnimalHealth", "Animal Health", ReportAccess.AnimalHealth),
+        ("/Reports/Feeding", "Feeding & Nutrition", ReportAccess.Feeding),
+        ("/Reports/HabitatSafety", "Habitat Safety", ReportAccess.HabitatSafety)
+    };
+}
+<div class="module-sidebar main-menu">
+    <div class="module-title">Main menu</div>
+    <nav class="nav flex-column">
+        <a class="nav-link @(inProducts ? "active" : "")" href="/">Products</a>
+
+        @if (ReportAccess.CanView(User))
+        {
+            var onOverview = path.Equals("/Reports", StringComparison.OrdinalIgnoreCase);
+            <a class="nav-link @(onOverview ? "active" : inReports ? "parent-active" : "")" href="/Reports">Reports</a>
+
+            @if (inReports)
+            {
+                <div class="sub-nav">
+                    @foreach (var r in reportLinks.Skip(1))
+                    {
+                        if (!ReportAccess.CanView(User, r.Roles)) { continue; }
+                        <a class="nav-link @(path.Equals(r.Url, StringComparison.OrdinalIgnoreCase) ? "active" : "")" href="@r.Url">@r.Title</a>
+                    }
+                </div>
+            }
+        }
+
+        @if (User.IsInRole("DBA"))
+        {
+            <a class="nav-link @(inAdmin ? "active" : "")" href="/ManageUsers">Admin</a>
+        }
+    </nav>
+</div>

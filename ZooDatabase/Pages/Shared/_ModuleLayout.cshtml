@@ -1,10 +1,23 @@
 @using ZooDatabase.Data
 @{
     Layout = "_Layout";
+    ViewData["InModule"] = true;
 
     var parts = Context.Request.Path.Value?.Trim('/').Split('/') ?? Array.Empty<string>();
     var module = ZooModules.Find(parts.ElementAtOrDefault(0));
-    var currentSection = parts.ElementAtOrDefault(1) ?? module?.Sections[0].Slug;
+    var currentSection = parts.ElementAtOrDefault(1);
+
+    // Pages that aren't in the sidebar (like /Animals/Details/5 or /Animals/Edit)
+    // highlight the section's first item, so you always know where you are.
+       if (module != null && !module.Sections.Any(s =>
+            string.Equals(s.Slug, currentSection, StringComparison.OrdinalIgnoreCase)))
+    {
+        // "EnclosureDetails" / "EnclosureEdit" belong to "Enclosures", etc.
+        var match = module.Sections.FirstOrDefault(s => currentSection != null &&
+            currentSection.StartsWith(s.Slug.TrimEnd('s'), StringComparison.OrdinalIgnoreCase));
+        currentSection = match?.Slug ?? module.Sections[0].Slug;
+    }
+
     bool canSeeReports = User.IsInRole("SuperUser") || User.IsInRole("DBA");
     bool canManageData = User.IsInRole("DBA") ||
                      User.IsInRole("SuperUser") ||
@@ -21,9 +34,7 @@
                     foreach (var s in module.Sections)
                     {
                         if (s.Slug == "Reports" && !canSeeReports) { continue; }
-                        if (module.Key == "Animals" && s.Slug == "Manage" && !canManageData) { continue; }
                         if (module.Key == "Staff" && s.Slug == "EmployeeManage" && !canManageData){ continue; }
-
 
                         var isActive = string.Equals(s.Slug, currentSection, StringComparison.OrdinalIgnoreCase);
                         <a class="nav-link @(isActive ? "active" : "")" href="/@module.Key/@s.Slug">@s.Title</a>

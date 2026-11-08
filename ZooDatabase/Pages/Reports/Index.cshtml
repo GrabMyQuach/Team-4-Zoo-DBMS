@@ -1,0 +1,29 @@
+@page
+@model ZooDatabase.Pages.Reports.IndexModel
+@using ZooDatabase.Data
+@{
+    ViewData["Title"] = "Reports";
+    var reports = new (string Url, string Title, string Roles)[]
+    {
+        ("/Reports/AnimalHealth", "Animal Health & Veterinary", ReportAccess.AnimalHealth),
+        ("/Reports/Feeding", "Feeding & Nutrition Compliance", ReportAccess.Feeding),
+        ("/Reports/HabitatSafety", "Habitat Safety & Maintenance", ReportAccess.HabitatSafety)
+    };
+}
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="mb-0 brand-title">Reports</h1>
+</div>
+
+
+<div class="row g-4">
+    @foreach (var r in reports)
+    {
+        if (!ReportAccess.CanView(User, r.Roles)) { continue; }
+        <div class="col-md-6 col-lg-4">
+            <a href="@r.Url" class="report-card">
+                <div class="report-card-title">@r.Title</div>
+            </a>
+        </div>
+    }
+</div>

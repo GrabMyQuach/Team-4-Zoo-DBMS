@@ -1,27 +1,60 @@
 @page
 @model ZooDatabase.Pages.Animals.AnimalsModel
+@using ZooDatabase.Data
 @{
     ViewData["Title"] = "Animals";
+    bool filtered = !string.IsNullOrWhiteSpace(Model.Search) || !string.IsNullOrWhiteSpace(Model.Health) || Model.EnclosureId != null;
 }
 
 <div class="border-bottom pb-3 mb-4">
     <h1 class="h2 mb-0">Animals</h1>
 </div>
 
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2 class="h5 mb-0">@Model.Animals.Count animals</h2>
-    @if (!User.IsInRole("ReadOnly"))
+    <h2 class="h5 mb-0">@Model.Rows.Count animals</h2>
+    @if (Model.CanEdit)
     {
-        <a href="/Animals/Manage" class="btn btn-primary rounded-pill px-4">Manage Animals</a>
+        <a href="/Animals/Edit" class="btn btn-primary rounded-pill px-4">+ Add Animal</a>
     }
 </div>
 
 <div class="card">
     <div class="card-body border-bottom">
-        <form method="get" class="d-flex gap-2" style="max-width: 480px;">
-            <input type="text" name="Search" value="@Model.Search" class="form-control"
-                   placeholder="Search name, species, or enclosure" />
-            <button type="submit" class="btn btn-outline-secondary rounded-pill px-4">Search</button>
+        <form method="get" class="row g-2 align-items-center">
+            <div class="col-md-5">
+                <input type="text" name="Search" value="@Model.Search" class="form-control"
+                       placeholder="Search name, species, or enclosure" />
+            </div>
+            <div class="col-md-3">
+                <select name="Health" class="form-select">
+                    <option value="">All health statuses</option>
+                    @foreach (var h in AnimalOptions.HealthStatuses)
+                    {
+                        <option value="@h" selected="@(Model.Health == h)">@h</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select name="EnclosureId" class="form-select">
+                    <option value="">All enclosures</option>
+                    @foreach (var e in Model.Enclosures)
+                    {
+                        <option value="@e.Id" selected="@(Model.EnclosureId == e.Id)">@e.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-outline-secondary rounded-pill px-3">Filter</button>
+                @if (filtered)
+                {
+                    <a href="/Animals/Animals" class="btn btn-link px-1">Clear</a>
+                }
+            </div>
         </form>
     </div>
 
@@ -32,16 +65,17 @@
                     <th>Name</th>
                     <th>Species</th>
                     <th>Enclosure</th>
-                    <th>Gender</th>
-                    <th>Born</th>
+                    <th>Sex</th>
+                    <th>Age</th>
                     <th>Health</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var a in Model.Animals)
+                @foreach (var a in Model.Rows)
                 {
-                    <tr>
-                        <td class="fw-semibold">@a.Name</td>
+                    <tr class="clickable-row" onclick="location.href='/Animals/Details/@a.AnimalId'">
+                        <td><a href="/Animals/Details/@a.AnimalId" class="fw-semibold text-decoration-none text-dark">@a.Name</a></td>
                         <td>
                             @a.Species
                             @if (a.ScientificName != null)
@@ -51,24 +85,21 @@
                         </td>
                         <td>@a.Enclosure</td>
                         <td>@a.Gender</td>
-                        <td>@(a.DateOfBirth?.ToString("MMM d, yyyy") ?? "Unknown")</td>
+                        <td>@AnimalOptions.AgeText(a.DateOfBirth)</td>
                         <td>
-                            @if (a.HealthStatus == "Healthy")
+                            @if (a.HealthStatus != null)
                             {
-                                <span class="badge bg-success">Healthy</span>
-                            }
-                            else if (a.HealthStatus != null)
-                            {
-                                <span class="badge bg-warning text-dark">@a.HealthStatus</span>
+                                <span class="badge @AnimalOptions.HealthBadgeClass(a.HealthStatus)">@a.HealthStatus</span>
                             }
                         </td>
+                        <td class="text-end text-muted">›</td>
                     </tr>
                 }
 
-                @if (Model.Animals.Count == 0)
+                @if (Model.Rows.Count == 0)
                 {
                     <tr>
-                        <td colspan="6" class="text-center text-muted py-4">No animals found.</td>
+                        <td colspan="7" class="text-center text-muted py-4">No animals found.</td>
                     </tr>
                 }
             </tbody>
