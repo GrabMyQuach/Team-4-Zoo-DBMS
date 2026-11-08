@@ -2,22 +2,47 @@
 @model ZooDatabase.Pages.Tickets.CustomersModel
 @{
     ViewData["Title"] = "Customers";
-    // ReadOnly users don't need customers' private contact info
-    bool showContact = !User.IsInRole("ReadOnly");
+    bool filtered = !string.IsNullOrWhiteSpace(Model.Search) || !string.IsNullOrEmpty(Model.Member);
 }
 
 <div class="border-bottom pb-3 mb-4">
     <h1 class="h2 mb-0">Customers</h1>
 </div>
 
-<h2 class="h5 mb-3">@Model.Rows.Count customers</h2>
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 mb-0">@Model.Rows.Count customers</h2>
+    @if (Model.CanSell)
+    {
+        <a href="/Tickets/CustomerEdit" class="btn btn-primary rounded-pill px-4">+ Add Customer</a>
+    }
+</div>
 
 <div class="card">
     <div class="card-body border-bottom">
-        <form method="get" class="d-flex gap-2" style="max-width: 480px;">
-            <input type="text" name="Search" value="@Model.Search" class="form-control"
-                   placeholder="Search name or email" />
-            <button type="submit" class="btn btn-outline-secondary rounded-pill px-4">Search</button>
+        <form method="get" class="row g-2 align-items-center">
+            <div class="col-md-6">
+                <input type="text" name="Search" value="@Model.Search" class="form-control"
+                       placeholder="@(Model.ShowContact ? "Search name or email" : "Search name")" />
+            </div>
+            <div class="col-md-3">
+                <select name="Member" class="form-select">
+                    <option value="">All customers</option>
+                    <option value="yes" selected="@(Model.Member == "yes")">Current members</option>
+                    <option value="no" selected="@(Model.Member == "no")">Not members</option>
+                </select>
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-outline-secondary rounded-pill px-3">Filter</button>
+                @if (filtered)
+                {
+                    <a href="/Tickets/Customers" class="btn btn-link px-1">Clear</a>
+                }
+            </div>
         </form>
     </div>
 
@@ -26,21 +51,23 @@
             <thead class="table-light">
                 <tr>
                     <th>Customer</th>
-                    @if (showContact)
+                    @if (Model.ShowContact)
                     {
                         <th>Contact</th>
                     }
                     <th>Membership</th>
-                    <th class="text-end">Purchases</th>
+                    <th class="text-end">Visits</th>
+                    <th>Last Visit</th>
                     <th class="text-end">Total Spent</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var c in Model.Rows)
                 {
-                    <tr>
-                        <td class="fw-semibold">@c.Name</td>
-                        @if (showContact)
+                    <tr class="clickable-row" onclick="location.href='/Tickets/CustomerDetails/@c.Id'">
+                        <td><a href="/Tickets/CustomerDetails/@c.Id" class="fw-semibold text-decoration-none text-dark">@c.Name</a></td>
+                        @if (Model.ShowContact)
                         {
                             <td>
                                 @c.Email
@@ -60,16 +87,15 @@
                                 <span class="text-muted">None</span>
                             }
                         </td>
-                        <td class="text-end">@c.Purchases</td>
+                        <td class="text-end">@c.Visits</td>
+                        <td>@(c.LastVisit?.ToString("MMM d, yyyy") ?? "—")</td>
                         <td class="text-end">@c.TotalSpent.ToString("C")</td>
+                        <td class="text-end text-muted">›</td>
                     </tr>
                 }
-
                 @if (Model.Rows.Count == 0)
                 {
-                    <tr>
-                        <td colspan="5" class="text-center text-muted py-4">No customers found.</td>
-                    </tr>
+                    <tr><td colspan="7" class="text-center text-muted py-4">No customers found.</td></tr>
                 }
             </tbody>
         </table>

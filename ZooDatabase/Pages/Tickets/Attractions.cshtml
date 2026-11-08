@@ -1,0 +1,65 @@
+@page
+@model ZooDatabase.Pages.Tickets.AttractionsModel
+@using ZooDatabase.Data
+@{
+    ViewData["Title"] = "Attractions";
+}
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">Attractions</h1>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 mb-0">@Model.Rows.Count attractions · @Model.Rows.Count(r => r.Status == "Open") open</h2>
+    @if (Model.CanManage)
+    {
+        <a href="/Tickets/AttractionEdit" class="btn btn-primary rounded-pill px-4">+ Add Attraction</a>
+    }
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Attraction</th><th>Status</th><th class="text-end">Price</th><th class="text-end">Staff</th>
+                    <th class="text-end">In Ticket Types</th><th class="text-end">Encounters, Next 7 Days</th>
+                    <th class="text-end">Encounter Guests, 30 Days</th><th class="text-end">Open Repairs</th>
+                    @if (Model.CanManage) { <th></th> }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var a in Model.Rows)
+                {
+                    <tr class="@(a.NeedsAttention ? "table-warning" : "") @(Model.CanManage ? "clickable-row" : "")"
+                        onclick="@(Model.CanManage ? $"location.href='/Tickets/AttractionEdit/{a.Id}'" : "")">
+                        <td>
+                            <span class="fw-semibold">@a.Name</span>
+                            <div class="small text-muted">@a.Type@(a.Location == null ? "" : " · " + a.Location)</div>
+                        </td>
+                        <td><span class="badge @SalesOptions.StatusBadge(a.Status)">@(a.Status ?? "Unknown")</span></td>
+                        <td class="text-end">@(a.Price == null || a.Price == 0 ? "Included" : a.Price.Value.ToString("C"))</td>
+                        <td class="text-end @(a.Status == "Open" && a.Staff == 0 ? "text-danger fw-semibold" : "")">@a.Staff</td>
+                        <td class="text-end">@a.InTickets</td>
+                        <td class="text-end">@a.Upcoming</td>
+                        <td class="text-end">@a.Guests30</td>
+                        <td class="text-end">@a.OpenRepairs</td>
+                        @if (Model.CanManage)
+                        {
+                            <td class="text-end text-muted">›</td>
+                        }
+                    </tr>
+                }
+                @if (Model.Rows.Count == 0)
+                {
+                    <tr><td colspan="9" class="text-center text-muted py-4">No attractions yet.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

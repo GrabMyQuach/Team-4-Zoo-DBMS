@@ -1,0 +1,138 @@
+@page
+@model ZooDatabase.Pages.Tickets.MembershipsModel
+@using ZooDatabase.Data
+@{
+    ViewData["Title"] = "Memberships";
+    bool filtered = !string.IsNullOrEmpty(Model.Status) || Model.TypeId != null || !string.IsNullOrWhiteSpace(Model.Search);
+}
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">Memberships</h1>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Active members</div>
+            <div class="stat-value">@Model.ActiveCount</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Expiring in 30 days</div>
+            <div class="stat-value @(Model.ExpiringCount > 0 ? "text-warning" : "")">@Model.ExpiringCount</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">New this month</div>
+            <div class="stat-value">@Model.NewThisMonth</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Active membership value</div>
+            <div class="stat-value">@Model.ActiveValue.ToString("C0")</div>
+        </div></div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body pb-0"><h2 class="h5 section-heading">By Tier</h2></div>
+    <table class="table align-middle mb-0">
+        <thead class="table-light">
+            <tr><th>Tier</th><th class="text-end">Active Members</th><th class="text-end">Annual Value</th><th class="text-end">Avg Visits per Member</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var t in Model.Tiers)
+            {
+                <tr>
+                    <td class="fw-semibold">@t.Name</td>
+                    <td class="text-end">@t.Active</td>
+                    <td class="text-end">@t.AnnualValue.ToString("C0")</td>
+                    <td class="text-end">@t.AvgVisits</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 mb-0">@Model.Rows.Count members</h2>
+    @if (Model.CanSell)
+    {
+        <a href="/Tickets/MembershipNew" class="btn btn-primary rounded-pill px-4">+ New Membership</a>
+    }
+</div>
+
+<div class="card">
+    <div class="card-body border-bottom">
+        <form method="get" class="row g-2 align-items-center">
+            <div class="col-md-4">
+                <input type="text" name="Search" value="@Model.Search" class="form-control" placeholder="Search name" />
+            </div>
+            <div class="col-md-3">
+                <select name="Status" class="form-select">
+                    <option value="">All statuses</option>
+                    @foreach (var s in ZooDatabase.Pages.Tickets.MembershipsModel.Statuses)
+                    {
+                        <option value="@s" selected="@(Model.Status == s)">@s</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select name="TypeId" class="form-select">
+                    <option value="">All tiers</option>
+                    @foreach (var t in Model.Types)
+                    {
+                        <option value="@t.Id" selected="@(Model.TypeId == t.Id)">@t.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-outline-secondary rounded-pill px-3">Filter</button>
+                @if (filtered)
+                {
+                    <a href="/Tickets/Memberships" class="btn btn-link px-1">Clear</a>
+                }
+            </div>
+        </form>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr><th>Member</th><th>Tier</th><th>Started</th><th>Expires</th><th class="text-end">Visits</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var m in Model.Rows)
+                {
+                    <tr class="clickable-row" onclick="location.href='/Tickets/CustomerDetails/@m.CustomerId'">
+                        <td class="fw-semibold">@m.Name</td>
+                        <td>@m.Type</td>
+                        <td>@m.Start.ToString("MMM d, yyyy")</td>
+                        <td>
+                            @m.End.ToString("MMM d, yyyy")
+                            @if (m.Status == "Expiring Soon")
+                            {
+                                <div class="small text-warning">@m.DaysLeft days left</div>
+                            }
+                        </td>
+                        <td class="text-end">@m.Visits</td>
+                        <td><span class="badge @SalesOptions.MembershipBadge(m.Status)">@m.Status</span></td>
+                        <td class="text-end text-muted">›</td>
+                    </tr>
+                }
+                @if (Model.Rows.Count == 0)
+                {
+                    <tr><td colspan="7" class="text-center text-muted py-4">No memberships found.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

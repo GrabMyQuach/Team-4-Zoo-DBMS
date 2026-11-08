@@ -1,0 +1,82 @@
+@page
+@model ZooDatabase.Pages.Shop.MenuItemsModel
+@{
+    ViewData["Title"] = "Menu Items";
+    var total = Model.Rows.Sum(r => r.Revenue30);
+    bool filtered = Model.StandId != null || !string.IsNullOrEmpty(Model.Category) || !string.IsNullOrWhiteSpace(Model.Search);
+}
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">Menu Items</h1>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 mb-0">@Model.Rows.Count items · @Model.Rows.Count(r => r.Sold30 == 0) not selling</h2>
+    @if (Model.CanManage)
+    {
+        <a href="/Shop/MenuItemEdit" class="btn btn-primary rounded-pill px-4">+ Add Menu Item</a>
+    }
+</div>
+
+<div class="card">
+    <div class="card-body border-bottom">
+        <form method="get" class="row g-2 align-items-center">
+            <div class="col-md-4"><input type="text" name="Search" value="@Model.Search" class="form-control" placeholder="Search item" /></div>
+            <div class="col-md-3">
+                <select name="StandId" class="form-select">
+                    <option value="">All stands</option>
+                    @foreach (var s in Model.Stands)
+                    {
+                        <option value="@s.Id" selected="@(Model.StandId == s.Id)">@s.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select name="Category" class="form-select">
+                    <option value="">All categories</option>
+                    @foreach (var c in Model.Categories)
+                    {
+                        <option value="@c" selected="@(Model.Category == c)">@c</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-outline-secondary rounded-pill px-3">Filter</button>
+                @if (filtered)
+                {
+                    <a href="/Shop/MenuItems" class="btn btn-link px-1">Clear</a>
+                }
+            </div>
+        </form>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr><th>Item</th><th>Stand</th><th class="text-end">Price</th><th class="text-end">Sold, 30 Days</th><th class="text-end">Revenue, 30 Days</th><th class="text-end">Share</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var i in Model.Rows)
+                {
+                    <tr class="@(Model.CanManage ? "clickable-row" : "") @(i.Sold30 == 0 ? "table-warning" : "")"
+                        onclick="@(Model.CanManage ? $"location.href='/Shop/MenuItemEdit/{i.Id}'" : "")">
+                        <td><span class="fw-semibold">@i.Name</span><div class="small text-muted">@i.Category</div></td>
+                        <td>@i.Stand</td>
+                        <td class="text-end">@i.Price.ToString("C")</td>
+                        <td class="text-end">@i.Sold30</td>
+                        <td class="text-end fw-semibold">@i.Revenue30.ToString("C0")</td>
+                        <td class="text-end">@(total == 0 ? "—" : Math.Round(100 * i.Revenue30 / total, 1) + "%")</td>
+                    </tr>
+                }
+                @if (Model.Rows.Count == 0)
+                {
+                    <tr><td colspan="6" class="text-center text-muted py-4">No menu items found.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

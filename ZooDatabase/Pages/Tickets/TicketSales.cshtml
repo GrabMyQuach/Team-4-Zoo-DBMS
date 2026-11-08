@@ -1,0 +1,86 @@
+@page
+@model ZooDatabase.Pages.Tickets.TicketSalesModel
+@{
+    ViewData["Title"] = "Ticket Sales";
+}
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">Ticket Sales</h1>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 mb-0">@Model.Rows.Count orders · @Model.TotalTickets tickets · @Model.TotalRevenue.ToString("C0")</h2>
+    @if (Model.CanSell)
+    {
+        <a href="/Tickets/TicketSaleNew" class="btn btn-primary rounded-pill px-4">+ New Ticket Sale</a>
+    }
+</div>
+
+<div class="card">
+    <div class="card-body border-bottom">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-2">
+                <label class="form-label small text-muted mb-1">Visit from</label>
+                <input type="date" name="From" value="@Model.StartDate.ToString("yyyy-MM-dd")" class="form-control" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted mb-1">Visit to</label>
+                <input type="date" name="To" value="@Model.EndDate.ToString("yyyy-MM-dd")" class="form-control" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small text-muted mb-1">Payment</label>
+                <select name="Payment" class="form-select">
+                    <option value="">All payment methods</option>
+                    @foreach (var p in Model.PaymentOptions)
+                    {
+                        <option value="@p" selected="@(Model.Payment == p)">@p</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small text-muted mb-1">Customer</label>
+                <input type="text" name="Search" value="@Model.Search" class="form-control" placeholder="Search name" />
+            </div>
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-outline-secondary rounded-pill px-3">Filter</button>
+                <a href="/Tickets/TicketSales" class="btn btn-link px-1">Clear</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr><th>Visit Date</th><th>Customer</th><th>Tickets</th><th>Payment</th><th class="text-end">Total</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var s in Model.Rows)
+                {
+                    <tr class="clickable-row" onclick="location.href='/Tickets/TicketSaleDetails/@s.Id'">
+                        <td>
+                            <a href="/Tickets/TicketSaleDetails/@s.Id" class="fw-semibold text-decoration-none text-dark">@s.VisitDate.ToString("ddd, MMM d")</a>
+                            @if (s.VisitDate > DateTime.Today)
+                            {
+                                <span class="badge bg-light text-dark border ms-1">Upcoming</span>
+                            }
+                        </td>
+                        <td>@s.Customer</td>
+                        <td>@s.Tickets<div class="small text-muted">@s.Items</div></td>
+                        <td>@s.Payment</td>
+                        <td class="text-end fw-semibold">@s.Total.ToString("C")</td>
+                        <td class="text-end text-muted">›</td>
+                    </tr>
+                }
+                @if (Model.Rows.Count == 0)
+                {
+                    <tr><td colspan="6" class="text-center text-muted py-4">No ticket sales in this period.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

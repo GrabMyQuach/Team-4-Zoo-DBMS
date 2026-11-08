@@ -1,0 +1,62 @@
+@model ZooDatabase.Pages.Shop.OutletListModel
+@{
+    var k = Model.Kind;
+    ViewData["Title"] = k.Plural;
+    var total = Model.Rows.Sum(r => r.Revenue30);
+}
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">@k.Plural</h1>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 mb-0">@Model.Rows.Count locations · @total.ToString("C0") in the last 30 days</h2>
+    @if (Model.CanManage)
+    {
+        <a href="@(k.UrlBase)Edit" class="btn btn-primary rounded-pill px-4">+ Add @k.Label</a>
+    }
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>@k.Label</th><th>Hours</th><th class="text-end">Items</th>
+                    <th class="text-end">Orders, 30 Days</th><th class="text-end">Avg Order</th>
+                    <th class="text-end">Revenue, 30 Days</th><th class="text-end">Share</th><th class="text-end">vs. Previous 30</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var o in Model.Rows)
+                {
+                    <tr class="clickable-row" onclick="location.href='@(k.UrlBase)Details/@o.Id'">
+                        <td>
+                            <a href="@(k.UrlBase)Details/@o.Id" class="fw-semibold text-decoration-none text-dark">@o.Name</a>
+                            <div class="small text-muted">@o.Category@(o.Location == null ? "" : " · " + o.Location)</div>
+                        </td>
+                        <td class="small">@o.Hours</td>
+                        <td class="text-end">@o.Items</td>
+                        <td class="text-end">@o.Orders30</td>
+                        <td class="text-end">@o.AvgOrder.ToString("C")</td>
+                        <td class="text-end fw-semibold">@o.Revenue30.ToString("C0")</td>
+                        <td class="text-end">@(total == 0 ? "—" : Math.Round(100 * o.Revenue30 / total, 1) + "%")</td>
+                        <td class="text-end @(o.ChangePct < 0 ? "text-danger" : o.ChangePct > 0 ? "text-success" : "")">
+                            @(o.ChangePct == null ? "—" : (o.ChangePct > 0 ? "+" : "") + o.ChangePct + "%")
+                        </td>
+                        <td class="text-end text-muted">›</td>
+                    </tr>
+                }
+                @if (Model.Rows.Count == 0)
+                {
+                    <tr><td colspan="9" class="text-center text-muted py-4">None yet.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

@@ -1,0 +1,55 @@
+@page
+@model ZooDatabase.Pages.Tickets.TicketTypesModel
+@{
+    ViewData["Title"] = "Ticket Types";
+}
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">Ticket Types</h1>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 mb-0">@Model.Rows.Count ticket types</h2>
+    @if (Model.CanManage)
+    {
+        <a href="/Tickets/TicketTypeEdit" class="btn btn-primary rounded-pill px-4">+ Add Ticket Type</a>
+    }
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr><th>Ticket</th><th class="text-end">Price</th><th>Includes</th><th class="text-end">Sold, 30 days</th><th class="text-end">Share</th><th class="text-end">Revenue, 30 days</th>@if (Model.CanManage) { <th></th> }</tr>
+            </thead>
+            <tbody>
+                @foreach (var t in Model.Rows)
+                {
+                    <tr class="@(Model.CanManage ? "clickable-row" : "")" onclick="@(Model.CanManage ? $"location.href='/Tickets/TicketTypeEdit/{t.Id}'" : "")">
+                        <td>
+                            <span class="fw-semibold">@t.Name</span>
+                            @if (t.Eligibility != null)
+                            {
+                                <div class="small text-muted">@t.Eligibility</div>
+                            }
+                        </td>
+                        <td class="text-end">@t.Price.ToString("C")</td>
+                        <td class="small">@(t.Attractions ?? "General admission")</td>
+                        <td class="text-end">@t.Sold30</td>
+                        <td class="text-end">@(Model.TotalSold == 0 ? "—" : Math.Round(100m * t.Sold30 / Model.TotalSold, 1) + "%")</td>
+                        <td class="text-end fw-semibold">@t.Revenue30.ToString("C0")</td>
+                        @if (Model.CanManage)
+                        {
+                            <td class="text-end text-muted">›</td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

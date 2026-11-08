@@ -1,0 +1,140 @@
+@page
+@model ZooDatabase.Pages.Shop.SaleNewModel
+@using ZooDatabase.Data
+@{
+    ViewData["Title"] = "New Sale";
+}
+
+<a href="/Shop/Sales" class="back-link mt-0 mb-3 d-inline-block">← Back</a>
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">New Sale@(Model.OutletChosen ? ": " + Model.OutletName : "")</h1>
+</div>
+
+@if (!Model.OutletChosen)
+{
+    <!-- Step 1: where is this sale happening? -->
+    <div class="row g-4" style="max-width: 900px;">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-body pb-0"><h2 class="h5 section-heading">Food Stands</h2></div>
+                <div class="list-group list-group-flush">
+                    @foreach (var s in Model.Stands)
+                    {
+                        <a href="/Shop/SaleNew?type=Food&outletId=@s.Id" class="list-group-item list-group-item-action">@s.Name</a>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-body pb-0"><h2 class="h5 section-heading">Gift Shops</h2></div>
+                <div class="list-group list-group-flush">
+                    @foreach (var s in Model.Shops)
+                    {
+                        <a href="/Shop/SaleNew?type=GiftShop&outletId=@s.Id" class="list-group-item list-group-item-action">@s.Name</a>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <!-- Step 2: what are they buying? -->
+    <div class="card" style="max-width: 860px;">
+        <div class="card-body p-4">
+            @if (Model.ErrorMessage != null)
+            {
+                <div class="alert alert-danger py-2">@Model.ErrorMessage</div>
+            }
+            <form method="post">
+                <input type="hidden" name="Type" value="@Model.Type" />
+                <input type="hidden" name="OutletId" value="@Model.OutletId" />
+
+                <table class="table align-middle mb-4">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Item</th><th class="text-end">Price</th>
+                            @if (!Model.IsFood) { <th class="text-end">In Stock</th> }
+                            <th style="width: 110px;">Qty</th><th class="text-end">Line Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var i in Model.Items)
+                        {
+                            var qty = Model.Quantities.TryGetValue(i.Id, out var q) ? q : 0;
+                            bool soldOut = i.Stock is <= 0;
+                            <tr class="@(soldOut ? "text-muted" : "")">
+                                <td><span class="fw-semibold">@i.Name</span><div class="small text-muted">@i.Category</div></td>
+                                <td class="text-end">@i.Price.ToString("C")</td>
+                                @if (!Model.IsFood)
+                                {
+                                    <td class="text-end @(soldOut ? "text-danger" : "")">@(soldOut ? "Sold out" : i.Stock.ToString())</td>
+                                }
+                                <td>
+                                    <input type="number" name="Quantities[@i.Id]" value="@qty" min="0" max="@(i.Stock ?? 100)"
+                                           class="form-control qty" disabled="@soldOut"
+                                           data-price="@i.Price.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
+                                </td>
+                                <td class="text-end line-total">$0.00</td>
+                            </tr>
+                        }
+                        <tr class="table-light">
+                            <td colspan="@(Model.IsFood ? 3 : 4)" class="text-end fw-semibold">Total</td>
+                            <td class="text-end fw-bold" id="grand-total">$0.00</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Customer (optional)</label>
+                        <select name="CustomerId" class="form-select">
+                            <option value="0">Walk-in</option>
+                            @foreach (var c in Model.Customers)
+                            {
+                                <option value="@c.Id" selected="@(Model.CustomerId == c.Id)">@c.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Payment method *</label>
+                        <select name="PaymentMethod" class="form-select">
+                            @foreach (var p in SalesOptions.PaymentMethods)
+                            {
+                                <option value="@p" selected="@(Model.PaymentMethod == p)">@p</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary rounded-pill px-4">Complete Sale</button>
+                    <a href="/Shop/SaleNew" class="btn btn-link">Change location</a>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        (function () {
+            var money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+            var totalCell = document.getElementById('grand-total');
+            if (!totalCell) return;
+            function update() {
+                var total = 0;
+                document.querySelectorAll('.qty').forEach(function (input) {
+                    var line = (parseInt(input.value) || 0) * parseFloat(input.dataset.price);
+                    input.closest('tr').querySelector('.line-total').textContent = money.format(line);
+                    total += line;
+                });
+                totalCell.textContent = money.format(total);
+            }
+            document.querySelectorAll('.qty').forEach(function (i) { i.addEventListener('input', update); });
+            update();
+        })();
+    </script>
+}

@@ -1,0 +1,59 @@
+@model ZooDatabase.Pages.Shop.OutletEditModel
+@{
+    var k = Model.Kind;
+    string title = Model.IsNew ? "Add " + k.Label : "Edit " + Model.Name;
+    ViewData["Title"] = title;
+    string listUrl = k.SaleType == "Food" ? "/Shop/FoodStands" : "/Shop/GiftShops";
+    string cancelUrl = Model.IsNew ? listUrl : $"{k.UrlBase}Details/{Model.Id}";
+}
+
+<a href="@cancelUrl" class="back-link mt-0 mb-3 d-inline-block">← Back</a>
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">@title</h1>
+</div>
+
+<div class="card" style="max-width: 640px;">
+    <div class="card-body p-4">
+        @if (Model.ErrorMessage != null)
+        {
+            <div class="alert alert-danger py-2">@Model.ErrorMessage</div>
+        }
+        <form method="post">
+            <div class="row g-3 mb-4">
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Name *</label>
+                    <input asp-for="Name" class="form-control" maxlength="100" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Category</label>
+                    <input asp-for="Category" class="form-control" maxlength="50"
+                           placeholder="@(k.SaleType == "Food" ? "e.g. Snacks, Grill, Drinks" : "e.g. Souvenirs, Toys, Apparel")" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Location</label>
+                    <input asp-for="Location" class="form-control" maxlength="100" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Opens</label>
+                    <input asp-for="Opens" type="time" class="form-control" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Closes</label>
+                    <input asp-for="Closes" type="time" class="form-control" />
+                </div>
+                @if (Model.HasDescription)
+                {
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Description</label>
+                        <input asp-for="Description" class="form-control" maxlength="255" />
+                    </div>
+                }
+            </div>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary rounded-pill px-4">@(Model.IsNew ? "Add " + k.Label : "Save Changes")</button>
+                <a href="@cancelUrl" class="btn btn-link">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>

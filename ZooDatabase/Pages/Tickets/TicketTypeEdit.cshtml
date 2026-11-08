@@ -1,0 +1,56 @@
+@page "{id:int?}"
+@model ZooDatabase.Pages.Tickets.TicketTypeEditModel
+@{
+    string title = Model.IsNew ? "Add Ticket Type" : "Edit " + Model.Name;
+    ViewData["Title"] = title;
+}
+
+<a href="/Tickets/TicketTypes" class="back-link mt-0 mb-3 d-inline-block">← Back</a>
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">@title</h1>
+</div>
+
+<div class="card" style="max-width: 640px;">
+    <div class="card-body p-4">
+        @if (Model.ErrorMessage != null)
+        {
+            <div class="alert alert-danger py-2">@Model.ErrorMessage</div>
+        }
+        <form method="post">
+            <div class="row g-3 mb-4">
+                <div class="col-md-8">
+                    <label class="form-label fw-semibold">Name *</label>
+                    <input asp-for="Name" class="form-control" maxlength="50" placeholder="e.g. Child (3-12)" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Price *</label>
+                    <input asp-for="Price" type="number" step="0.01" min="0" class="form-control" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Who can buy it</label>
+                    <input asp-for="Eligibility" class="form-control" maxlength="255" placeholder="e.g. Ages 3-12, ID required for seniors" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Includes these attractions</label>
+                    <div class="row">
+                        @foreach (var a in Model.Attractions)
+                        {
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="AttractionIds" value="@a.Id" id="att-@a.Id"
+                                           checked="@Model.AttractionIds.Contains(a.Id)" />
+                                    <label class="form-check-label" for="att-@a.Id">@a.Name</label>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary rounded-pill px-4">@(Model.IsNew ? "Add Ticket Type" : "Save Changes")</button>
+                <a href="/Tickets/TicketTypes" class="btn btn-link">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>

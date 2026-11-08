@@ -1,0 +1,302 @@
+@page
+@model ZooDatabase.Pages.Reports.RevenueModel
+@using ZooDatabase.Pages.Reports
+@{
+    ViewData["Title"] = "Revenue Report";
+    ViewData["ReportTitle"] = "Revenue, Expenses & Visitors";
+    ViewData["ReportFilters"] = "";
+    var maxDay = Model.Weekdays.Count == 0 ? 1m : Math.Max(1m, Model.Weekdays.Max(d => d.Visitors));
+    var maxUp = Model.Upcoming.Count == 0 ? 1m : Math.Max(1m, Model.Upcoming.Max(d => d.Visitors));
+    var streams = new[] { ("Tickets", Model.Tickets), ("Food", Model.Food), ("Gift shop", Model.Gifts), ("Memberships", Model.Memberships) };
+    var costs = new[] { ("Labor", Model.Labor), ("Feed and stock", Model.Supplies), ("Repairs", Model.Repairs) };
+    string Pct(decimal part, decimal whole) => whole == 0 ? "—" : Math.Round(100 * part / whole, 1) + "%";
+}
+
+<partial name="_ReportHeader" model="Model" />
+
+<!-- Filters -->
+<div class="card mb-4 no-print">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small text-muted mb-1">From</label>
+                <input type="date" name="From" value="@Model.StartDate.ToString("yyyy-MM-dd")" class="form-control" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small text-muted mb-1">To</label>
+                <input type="date" name="To" value="@Model.EndDate.ToString("yyyy-MM-dd")" class="form-control" />
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-primary rounded-pill px-4">Run</button>
+                <a href="/Reports/Revenue" class="btn btn-link px-1">Reset</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Headline numbers -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Revenue</div>
+            <div class="stat-value">@Model.Revenue.ToString("C0")</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Expenses</div>
+            <div class="stat-value">@Model.Expenses.ToString("C0")</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Net</div>
+            <div class="stat-value @(Model.Net < 0 ? "text-danger" : "")">@Model.Net.ToString("C0")</div>
+            <div class="small text-muted">@Model.MarginPct% margin</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Visitors</div>
+            <div class="stat-value">@Model.Visitors.ToString("N0")</div>
+            <div class="small text-muted">@(Model.VisitDays == 0 ? 0 : Model.Visitors / Model.VisitDays) per open day</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Spend per visitor</div>
+            <div class="stat-value">@Model.SpendPerVisitor.ToString("C")</div>
+            <div class="small text-muted">@Model.InParkPerVisitor.ToString("C") on food and gifts</div>
+        </div></div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- Where the money comes from / goes -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-body pb-0"><h2 class="h5 section-heading">Revenue by Stream</h2></div>
+            <table class="table align-middle mb-0">
+                <tbody>
+                    @foreach (var (name, amount) in streams)
+                    {
+                        <tr>
+                            <td style="width: 120px;">@name</td>
+                            <td><div class="mini-bar"><div class="mini-bar-fill" style="width: @(Model.Revenue == 0 ? 0 : (int)(amount * 100 / Model.Revenue))%;"></div></div></td>
+                            <td class="text-end">@Pct(amount, Model.Revenue)</td>
+                            <td class="text-end fw-semibold">@amount.ToString("C0")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-body pb-0"><h2 class="h5 section-heading">Expenses by Type</h2></div>
+            <table class="table align-middle mb-0">
+                <tbody>
+                    @foreach (var (name, amount) in costs)
+                    {
+                        <tr>
+                            <td style="width: 120px;">@name</td>
+                            <td><div class="mini-bar"><div class="mini-bar-fill" style="width: @(Model.Expenses == 0 ? 0 : (int)(amount * 100 / Model.Expenses))%;"></div></div></td>
+                            <td class="text-end">@Pct(amount, Model.Expenses)</td>
+                            <td class="text-end fw-semibold">@amount.ToString("C0")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Monthly P&L -->
+<div class="card mb-4">
+    <div class="card-body pb-0"><h2 class="h5 section-heading">Monthly Profit and Loss</h2></div>
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead class="table-light">
+                <tr><th>Month</th><th class="text-end">Visitors</th><th class="text-end">Tickets</th><th class="text-end">Food</th><th class="text-end">Gift Shop</th><th class="text-end">Memberships</th><th class="text-end">Revenue</th><th class="text-end">Expenses</th><th class="text-end">Net</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var m in Model.Months)
+                {
+                    <tr class="@(m.Net < 0 ? "table-danger" : "")">
+                        <td class="fw-semibold">@ReportPageModel.MonthName(m.Key)</td>
+                        <td class="text-end">@m.Visitors.ToString("N0")</td>
+                        <td class="text-end">@m.Tickets.ToString("C0")</td>
+                        <td class="text-end">@m.Food.ToString("C0")</td>
+                        <td class="text-end">@m.Gifts.ToString("C0")</td>
+                        <td class="text-end">@m.Memberships.ToString("C0")</td>
+                        <td class="text-end fw-semibold">@m.Revenue.ToString("C0")</td>
+                        <td class="text-end">@m.Expenses.ToString("C0")</td>
+                        <td class="text-end fw-semibold @(m.Net < 0 ? "text-danger" : "")">@m.Net.ToString("C0")</td>
+                    </tr>
+                }
+                @if (Model.Months.Count == 0)
+                {
+                    <tr><td colspan="9" class="text-center text-muted py-3">No activity in this period.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- Day of week -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-body pb-0"><h2 class="h5 section-heading">Busiest Days</h2></div>
+            <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                    <tr><th>Day</th><th style="width: 40%;">Avg Visitors</th><th class="text-end"></th><th class="text-end">Avg Revenue</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var d in Model.Weekdays)
+                    {
+                        <tr>
+                            <td>@d.Label</td>
+                            <td><div class="mini-bar"><div class="mini-bar-fill" style="width: @((int)(d.Visitors * 100 / maxDay))%;"></div></div></td>
+                            <td class="text-end">@d.Visitors.ToString("0")</td>
+                            <td class="text-end">@d.Revenue.ToString("C0")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Bookings ahead -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-body pb-0"><h2 class="h5 section-heading">Booked Visitors, Next 14 Days</h2></div>
+            <table class="table table-sm align-middle mb-0">
+                <tbody>
+                    @foreach (var d in Model.Upcoming)
+                    {
+                        <tr>
+                            <td style="width: 110px;">@d.Label</td>
+                            <td><div class="mini-bar"><div class="mini-bar-fill" style="width: @((int)(d.Visitors * 100 / maxUp))%;"></div></div></td>
+                            <td class="text-end">@d.Visitors.ToString("0")</td>
+                            <td class="text-end">@d.Revenue.ToString("C0")</td>
+                        </tr>
+                    }
+                    @if (Model.Upcoming.Count == 0)
+                    {
+                        <tr><td class="text-center text-muted py-3">No advance bookings.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- Ticket mix -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-body pb-0"><h2 class="h5 section-heading">Ticket Mix</h2></div>
+            <table class="table align-middle mb-0">
+                <thead class="table-light">
+                    <tr><th>Ticket</th><th class="text-end">Sold</th><th class="text-end">Share</th><th class="text-end">Revenue</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in Model.TicketMix)
+                    {
+                        <tr>
+                            <td>@t.Name</td>
+                            <td class="text-end">@t.Count.ToString("N0")</td>
+                            <td class="text-end">@Pct(t.Count, Model.Visitors)</td>
+                            <td class="text-end fw-semibold">@t.Amount.ToString("C0")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Members vs others -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-body pb-0"><h2 class="h5 section-heading">Members vs. Non-members</h2></div>
+            <table class="table align-middle mb-0">
+                <thead class="table-light">
+                    <tr><th></th><th class="text-end">Visits</th><th class="text-end">Tickets per Visit</th><th class="text-end">Food and Gifts per Visit</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in Model.Segments)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@s.Name</td>
+                            <td class="text-end">@s.Visits.ToString("N0")</td>
+                            <td class="text-end">@s.TicketPerVisit.ToString("C")</td>
+                            <td class="text-end">@s.ShopPerVisit.ToString("C")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Locations -->
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-body pb-0"><h2 class="h5 section-heading">Food Stands and Gift Shops</h2></div>
+            <table class="table align-middle mb-0">
+                <thead class="table-light">
+                    <tr><th>Location</th><th class="text-end">Orders</th><th class="text-end">Avg Order</th><th class="text-end">Per Visitor</th><th class="text-end">Revenue</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var o in Model.Outlets)
+                    {
+                        <tr>
+                            <td>@o.Name<div class="small text-muted">@o.Type</div></td>
+                            <td class="text-end">@o.Orders.ToString("N0")</td>
+                            <td class="text-end">@o.AvgOrder.ToString("C")</td>
+                            <td class="text-end">@((Model.Visitors == 0 ? 0 : o.Revenue / Model.Visitors).ToString("C"))</td>
+                            <td class="text-end fw-semibold">@o.Revenue.ToString("C0")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Top items + payments -->
+    <div class="col-lg-5">
+        <div class="card mb-4">
+            <div class="card-body pb-0"><h2 class="h5 section-heading">Top 10 Items</h2></div>
+            <table class="table table-sm align-middle mb-0">
+                <tbody>
+                    @foreach (var t in Model.TopItems)
+                    {
+                        <tr>
+                            <td>@t.Name<div class="small text-muted">@t.Detail</div></td>
+                            <td class="text-end">@t.Count sold</td>
+                            <td class="text-end fw-semibold">@t.Amount.ToString("C0")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="card">
+            <div class="card-body pb-0"><h2 class="h5 section-heading">Payment Methods</h2></div>
+            <table class="table table-sm align-middle mb-0">
+                <tbody>
+                    @foreach (var p in Model.Payments)
+                    {
+                        <tr>
+                            <td>@p.Name</td>
+                            <td class="text-end">@p.Count.ToString("N0")</td>
+                            <td class="text-end">@Pct(p.Amount, Model.Payments.Sum(x => x.Amount))</td>
+                            <td class="text-end fw-semibold">@p.Amount.ToString("C0")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

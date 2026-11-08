@@ -1,0 +1,55 @@
+@page "{id:int?}"
+@model ZooDatabase.Pages.Shop.MenuItemEditModel
+@{
+    string title = Model.IsNew ? "Add Menu Item" : "Edit " + Model.Name;
+    ViewData["Title"] = title;
+}
+
+<a href="/Shop/MenuItems" class="back-link mt-0 mb-3 d-inline-block">← Back</a>
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">@title</h1>
+</div>
+
+<div class="card" style="max-width: 640px;">
+    <div class="card-body p-4">
+        @if (Model.ErrorMessage != null)
+        {
+            <div class="alert alert-danger py-2">@Model.ErrorMessage</div>
+        }
+        <form method="post">
+            <div class="row g-3 mb-4">
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Food stand *</label>
+                    <select name="StandId" class="form-select">
+                        <option value="0">Choose a stand…</option>
+                        @foreach (var s in Model.Stands)
+                        {
+                            <option value="@s.Id" selected="@(Model.StandId == s.Id)">@s.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label fw-semibold">Name *</label>
+                    <input asp-for="Name" class="form-control" maxlength="100" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Price *</label>
+                    <input asp-for="Price" type="number" step="0.01" min="0" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Category</label>
+                    <input asp-for="Category" class="form-control" maxlength="50" placeholder="e.g. Entree, Drink" />
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label fw-semibold">Description</label>
+                    <input asp-for="Description" class="form-control" maxlength="255" />
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary rounded-pill px-4">@(Model.IsNew ? "Add Item" : "Save Changes")</button>
+                <a href="/Shop/MenuItems" class="btn btn-link">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>

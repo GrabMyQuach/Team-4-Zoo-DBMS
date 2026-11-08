@@ -1,0 +1,49 @@
+@page "{id:int?}"
+@model ZooDatabase.Pages.Shop.SupplierEditModel
+@{
+    string title = Model.IsNew ? "Add Supplier" : "Edit " + Model.Name;
+    ViewData["Title"] = title;
+}
+
+<a href="/Shop/Suppliers" class="back-link mt-0 mb-3 d-inline-block">← Back</a>
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">@title</h1>
+</div>
+
+<div class="card" style="max-width: 640px;">
+    <div class="card-body p-4">
+        @if (Model.ErrorMessage != null)
+        {
+            <div class="alert alert-danger py-2">@Model.ErrorMessage</div>
+        }
+        <form method="post">
+            <div class="row g-3 mb-4">
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Name *</label>
+                    <input asp-for="Name" class="form-control" maxlength="100" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Email</label>
+                    <input asp-for="Email" type="email" class="form-control" maxlength="100" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Phone</label>
+                    <input asp-for="Phone" class="form-control" maxlength="20" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Address</label>
+                    <input asp-for="Address" class="form-control" maxlength="255" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Delivery schedule</label>
+                    <input asp-for="Delivery" class="form-control" maxlength="100" placeholder="e.g. Mondays and Thursdays" />
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary rounded-pill px-4">@(Model.IsNew ? "Add Supplier" : "Save Changes")</button>
+                <a href="/Shop/Suppliers" class="btn btn-link">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>

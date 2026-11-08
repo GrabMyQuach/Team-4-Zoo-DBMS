@@ -1,0 +1,147 @@
+@page
+@model ZooDatabase.Pages.Shop.InventoryModel
+@{
+    ViewData["Title"] = "Inventory";
+}
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">Inventory</h1>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Out of stock</div>
+            <div class="stat-value @(Model.Rows.Any(r => r.Status == "Out of stock") ? "text-danger" : "")">@Model.Rows.Count(r => r.Status == "Out of stock")</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Below reorder level</div>
+            <div class="stat-value">@Model.Rows.Count(r => r.Status == "Below reorder level")</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Under 14 days left</div>
+            <div class="stat-value">@Model.Rows.Count(r => r.Status == "Under 14 days left")</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Open restock orders</div>
+            <div class="stat-value">@Model.OpenOrders.Count</div>
+            <div class="small text-muted">@Model.OpenOrders.Count(o => o.Status == "Draft") need approval</div>
+        </div></div>
+    </div>
+</div>
+
+<!-- Restock orders -->
+<div class="card mb-4">
+    <div class="card-body pb-0"><h2 class="h5 section-heading">Open Restock Orders</h2></div>
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead class="table-light">
+                <tr><th>#</th><th>Item</th><th>Supplier</th><th class="text-end">Quantity</th><th class="text-end">Cost</th><th>Expected</th><th>Status</th>@if (Model.CanManage) { <th></th> }</tr>
+            </thead>
+            <tbody>
+                @foreach (var o in Model.OpenOrders)
+                {
+                    <tr class="@(o.Late ? "table-warning" : "")">
+                        <td>@o.Id</td>
+                        <td>
+                            <span class="fw-semibold">@o.Item</span>
+                            <div class="small text-muted">@o.Kind@(o.Auto ? " · drafted automatically" : "")</div>
+                        </td>
+                        <td>@(o.Supplier ?? "No supplier")</td>
+                        <td class="text-end">@o.Quantity.ToString("0.##") @o.Unit</td>
+                        <td class="text-end">@(o.Total?.ToString("C0") ?? "—")</td>
+                        <td>@(o.Expected?.ToString("MMM d") ?? "—")@(o.Late ? " (late)" : "")</td>
+                        <td><span class="badge @(o.Status == "Draft" ? "bg-light text-dark border" : "bg-warning text-dark")">@o.Status</span></td>
+                        @if (Model.CanManage)
+                        {
+                            <td class="text-end text-nowrap">
+                                <form method="post" class="d-inline">
+                                    <input type="hidden" name="poId" value="@o.Id" />
+                                    @if (o.Status == "Draft")
+                                    {
+                                        <button type="submit" asp-page-handler="OrderStatus" name="status" value="Ordered" class="btn btn-sm btn-primary rounded-pill">Place Order</button>
+                                    }
+                                    else
+                                    {
+                                        <button type="submit" asp-page-handler="OrderStatus" name="status" value="Received" class="btn btn-sm btn-primary rounded-pill">Mark Received</button>
+                                    }
+                                    <button type="submit" asp-page-handler="OrderStatus" name="status" value="Cancelled" class="btn btn-sm btn-link text-danger"
+                                            onclick="return confirm('Cancel this order?');">Cancel</button>
+                                </form>
+                            </td>
+                        }
+                    </tr>
+                }
+                @if (Model.OpenOrders.Count == 0)
+                {
+                    <tr><td colspan="8" class="text-center text-muted py-3">No open orders.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Stock -->
+<div class="card">
+    <div class="card-body pb-0 d-flex justify-content-between align-items-center">
+        <h2 class="h5 section-heading mb-3">Gift Shop Stock</h2>
+        <div class="mb-3">
+            <a href="/Shop/Inventory" class="btn btn-sm @(Model.Show != "attention" ? "btn-primary" : "btn-outline-secondary") rounded-pill">All</a>
+            <a href="/Shop/Inventory?show=attention" class="btn btn-sm @(Model.Show == "attention" ? "btn-primary" : "btn-outline-secondary") rounded-pill">Needs attention</a>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr><th>Product</th><th class="text-end">In Stock</th><th class="text-end">Reorder At</th><th class="text-end">Sells / Day</th><th class="text-end">Days Left</th><th>Status</th>@if (Model.CanManage) { <th></th> }</tr>
+            </thead>
+            <tbody>
+                @foreach (var s in Model.Rows)
+                {
+                    <tr class="@(s.Status == "Out of stock" ? "table-danger" : s.Status != "OK" ? "table-warning" : "")">
+                        <td>
+                            <a href="/Shop/ProductDetails/@s.ProductId" class="fw-semibold text-decoration-none text-dark">@s.Name</a>
+                            <div class="small text-muted">@s.Shop</div>
+                        </td>
+                        <td class="text-end fw-semibold">@s.Stock</td>
+                        <td class="text-end">@s.Reorder</td>
+                        <td class="text-end">@s.DailySales</td>
+                        <td class="text-end">@(s.DaysLeft?.ToString() ?? "—")</td>
+                        <td class="small">@s.Status@(s.OpenOrders > 0 ? " · on order" : "")</td>
+                        @if (Model.CanManage)
+                        {
+                            <td class="text-end">
+                                @if (s.Status != "OK" && s.OpenOrders == 0 && s.HasSupplier)
+                                {
+                                    <form method="post" asp-page-handler="Reorder" class="d-inline">
+                                        <input type="hidden" name="productId" value="@s.ProductId" />
+                                        <button type="submit" class="btn btn-sm btn-outline-primary rounded-pill">Reorder</button>
+                                    </form>
+                                }
+                                else if (s.Status != "OK" && !s.HasSupplier)
+                                {
+                                    <span class="small text-muted">No supplier</span>
+                                }
+                            </td>
+                        }
+                    </tr>
+                }
+                @if (Model.Rows.Count == 0)
+                {
+                    <tr><td colspan="7" class="text-center text-muted py-3">Nothing to show.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

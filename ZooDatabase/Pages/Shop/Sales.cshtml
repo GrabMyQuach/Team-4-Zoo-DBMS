@@ -1,0 +1,114 @@
+@page
+@model ZooDatabase.Pages.Shop.SalesModel
+@{
+    ViewData["Title"] = "Sales";
+    var total = Model.Rows.Sum(r => r.Total);
+}
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">Sales</h1>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Revenue</div>
+            <div class="stat-value">@total.ToString("C0")</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Orders</div>
+            <div class="stat-value">@Model.Rows.Count</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Average order</div>
+            <div class="stat-value">@((Model.Rows.Count == 0 ? 0 : total / Model.Rows.Count).ToString("C"))</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Food / gift split</div>
+            <div class="stat-value fs-5">
+                @Model.Rows.Where(r => r.Type == "Food").Sum(r => r.Total).ToString("C0") / @Model.Rows.Where(r => r.Type != "Food").Sum(r => r.Total).ToString("C0")
+            </div>
+        </div></div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 mb-0">@Model.Rows.Count sales</h2>
+    @if (Model.CanSell)
+    {
+        <a href="/Shop/SaleNew" class="btn btn-primary rounded-pill px-4">+ New Sale</a>
+    }
+</div>
+
+<div class="card">
+    <div class="card-body border-bottom">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-2">
+                <label class="form-label small text-muted mb-1">From</label>
+                <input type="date" name="From" value="@Model.StartDate.ToString("yyyy-MM-dd")" class="form-control" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted mb-1">To</label>
+                <input type="date" name="To" value="@Model.EndDate.ToString("yyyy-MM-dd")" class="form-control" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small text-muted mb-1">Type</label>
+                <select name="Type" class="form-select">
+                    <option value="">Food and gift shop</option>
+                    <option value="Food" selected="@(Model.Type == "Food")">Food only</option>
+                    <option value="GiftShop" selected="@(Model.Type == "GiftShop")">Gift shop only</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small text-muted mb-1">Payment</label>
+                <select name="Payment" class="form-select">
+                    <option value="">All payment methods</option>
+                    @foreach (var p in Model.PaymentOptions)
+                    {
+                        <option value="@p" selected="@(Model.Payment == p)">@p</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-outline-secondary rounded-pill px-3">Filter</button>
+                <a href="/Shop/Sales" class="btn btn-link px-1">Clear</a>
+            </div>
+        </form>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr><th>When</th><th>Where</th><th>Customer</th><th>Cashier</th><th class="text-end">Items</th><th>Payment</th><th class="text-end">Total</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var s in Model.Rows)
+                {
+                    <tr class="clickable-row" onclick="location.href='/Shop/SaleDetails/@s.Id'">
+                        <td>@s.Date.ToString("MMM d, h:mm tt")</td>
+                        <td>@s.Place<div class="small text-muted">@(s.Type == "Food" ? "Food" : "Gift Shop")</div></td>
+                        <td>@(s.Customer ?? "Walk-in")</td>
+                        <td>@(s.Cashier ?? "—")</td>
+                        <td class="text-end">@s.Items</td>
+                        <td>@s.Payment</td>
+                        <td class="text-end fw-semibold">@s.Total.ToString("C")</td>
+                    </tr>
+                }
+                @if (Model.Rows.Count == 0)
+                {
+                    <tr><td colspan="7" class="text-center text-muted py-4">No sales in this period.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

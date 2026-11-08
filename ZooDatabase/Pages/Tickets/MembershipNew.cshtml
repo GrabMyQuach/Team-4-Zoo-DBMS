@@ -1,0 +1,66 @@
+@page
+@model ZooDatabase.Pages.Tickets.MembershipNewModel
+@{
+    ViewData["Title"] = "New Membership";
+    string cancelUrl = Model.CustomerId > 0 ? $"/Tickets/CustomerDetails/{Model.CustomerId}" : "/Tickets/Memberships";
+}
+
+<a href="@cancelUrl" class="back-link mt-0 mb-3 d-inline-block">← Back</a>
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">New Membership</h1>
+</div>
+
+<div class="card" style="max-width: 720px;">
+    <div class="card-body p-4">
+        @if (Model.ErrorMessage != null)
+        {
+            <div class="alert alert-danger py-2">@Model.ErrorMessage</div>
+        }
+        @if (Model.CurrentEnd != null && Model.CurrentEnd >= DateTime.Today)
+        {
+            <div class="alert alert-info py-2">Current membership ends @Model.CurrentEnd.Value.ToString("MMM d, yyyy"). This will be a renewal.</div>
+        }
+
+        <form method="post">
+            <div class="row g-3 mb-4">
+                <div class="col-md-8">
+                    <label class="form-label fw-semibold">Customer *</label>
+                    <select name="CustomerId" class="form-select" onchange="if (this.value !== '0') location.href='/Tickets/MembershipNew?customerId=' + this.value;">
+                        <option value="0">Choose a customer…</option>
+                        @foreach (var c in Model.Customers)
+                        {
+                            <option value="@c.Id" selected="@(Model.CustomerId == c.Id)">@c.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Start date *</label>
+                    <input type="date" name="StartDate" value="@Model.StartDate.ToString("yyyy-MM-dd")" class="form-control" />
+                    <div class="form-text">Lasts one year.</div>
+                </div>
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Tier *</label>
+                    @foreach (var t in Model.Types)
+                    {
+                        <div class="form-check border rounded-3 p-3 ps-5 mb-2">
+                            <input class="form-check-input" type="radio" name="TypeId" value="@t.Id" id="tier-@t.Id" checked="@(Model.TypeId == t.Id)" />
+                            <label class="form-check-label w-100" for="tier-@t.Id">
+                                <span class="fw-semibold">@t.Name</span>
+                                <span class="float-end fw-semibold">@t.Price.ToString("C")</span>
+                                @if (t.Benefits != null)
+                                {
+                                    <div class="small text-muted">@t.Benefits</div>
+                                }
+                            </label>
+                        </div>
+                    }
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary rounded-pill px-4">Add Membership</button>
+                <a href="@cancelUrl" class="btn btn-link">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>

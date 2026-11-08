@@ -18,6 +18,9 @@ public static class ReportAccess
     // Labor cost and staff attendance are a management concern.
     public const string Staffing = "DBA,SuperUser";
 
+    // Revenue, expenses and profit are a management concern.
+    public const string Revenue = "DBA,SuperUser";
+
     // Anyone who can see at least one report (used for the Reports link and overview page)
     public const string AnyReport = "DBA,SuperUser,Veterinarian,Zookeeper";
 
