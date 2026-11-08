@@ -313,7 +313,13 @@
     <div class="col-12">
         <div class="card">
             <div class="card-body p-4">
-                <h2 class="h5 section-heading">Health History</h2>
+                <div class="d-flex justify-content-between align-items-center">
+    <h2 class="h5 section-heading">Health History</h2>
+    @if (Model.CanRecordHealth)
+    {
+        <a href="/Animals/HealthNew/@Model.Animal.AnimalId" class="btn btn-sm btn-primary rounded-pill px-3">Record Exam</a>
+    }
+</div>
                 @if (Model.HealthHistory.Count == 0)
                 {
                     <p class="text-muted mb-0">No vet records yet.</p>
