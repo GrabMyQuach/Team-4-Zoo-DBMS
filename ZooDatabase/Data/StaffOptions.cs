@@ -14,7 +14,7 @@ public static class StaffOptions
     public static bool CanSeePrivate(ClaimsPrincipal user) => user.IsInRole("DBA") || user.IsInRole("SuperUser");
 
     public static readonly string[] Genders = { "Female", "Male", "Other" };
-    public static readonly string[] EmploymentTypes = { "Full-Time", "Part-Time", "Seasonal", "Contract" };
+    public static readonly string[] EmploymentTypes = { "Full-Time", "Part-Time" };
     public static readonly string[] PayTypes = { "Salary", "Hourly" };
     public static readonly string[] ExperienceLevels = { "Junior", "Intermediate", "Senior" };
 

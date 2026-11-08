@@ -16,16 +16,16 @@ public static class AnimalOptions
     public static readonly string[] Genders = { "Male", "Female", "Unknown" };
 
     public static readonly string[] HealthStatuses =
-        { "Healthy", "Under Observation", "Recovering", "Recovered", "Quarantine", "Quarantined", "Critical" };
+        { "Healthy", "Under Observation", "Recovering", "Recovered", "Quarantined" };
 
     public static readonly string[] AcquisitionTypes =
-        { "Born at Zoo", "Transfer", "Rescue", "Loan", "Purchase" };
+        { "Born at Zoo", "Transfer In", "Rescue", "Purchase" };
 
     // Badge color for a health status: green = fine, yellow = watch, red = urgent
     public static string HealthBadgeClass(string? status) => status switch
     {
         "Healthy" or "Recovered" => "bg-success",
-        "Quarantine" or "Quarantined" or "Critical" => "bg-danger",
+        "Quarantined" => "bg-danger",
         null or "" => "bg-secondary",
         _ => "bg-warning text-dark"
     };

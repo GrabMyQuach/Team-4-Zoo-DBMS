@@ -101,7 +101,7 @@ public class ProductEditModel : PageModel
         if (SupplierId > 0)
         {
             await using var cmd = new MySqlCommand(@"
-                INSERT INTO Supplier_Product (Supplier_ID, Product_ID, Unit_Cost, Availability) VALUES (@s, @id, @cost, 'Available')
+                INSERT INTO Supplier_Product (Supplier_ID, Product_ID, Unit_Cost, Availability) VALUES (@s, @id, @cost, 'In Stock')
                 ON DUPLICATE KEY UPDATE Unit_Cost = COALESCE(@cost, Unit_Cost)", conn, tx);
             cmd.Parameters.AddWithValue("@s", SupplierId);
             cmd.Parameters.AddWithValue("@id", productId);

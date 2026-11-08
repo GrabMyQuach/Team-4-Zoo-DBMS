@@ -193,3 +193,4 @@ header .btn {
 .main-menu .nav-link.parent-active { color: #1f5f3f; font-weight: 600; }
 @media print { main .row > section { flex: 0 0 100%; max-width: 100%; } }
 .card > .card-body.pb-0 { flex-grow: 0; }
+.mini-bar { min-width: 100px; }

@@ -1,6 +1,10 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 
 var builder = WebApplication.CreateBuilder(args);
+// Always format dates and money as US English, no matter what server we run on
+var usCulture = new System.Globalization.CultureInfo("en-US");
+System.Globalization.CultureInfo.DefaultThreadCurrentCulture = usCulture;
+System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = usCulture;
 
 // 1. Turn on login using cookies
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)

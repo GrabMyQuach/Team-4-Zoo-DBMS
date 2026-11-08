@@ -18,8 +18,8 @@ public static class SalesOptions
     public static bool CanSeeContact(ClaimsPrincipal user) =>
         user.Identity?.IsAuthenticated == true && !user.IsInRole("ReadOnly");
 
-    public static readonly string[] PaymentMethods = { "Credit Card", "Debit Card", "Cash", "Mobile Pay" };
-    public static readonly string[] AttractionStatuses = { "Open", "Closed", "Under Maintenance", "Seasonal" };
+    public static readonly string[] PaymentMethods = { "Credit Card", "Debit Card", "Cash", "Mobile Pay", "PayPal" };
+    public static readonly string[] AttractionStatuses = { "Open", "Closed", "Maintenance", "Closed for Season" };
 
     // Membership status from its dates, so it is always current
     public static string MembershipStatus(DateTime start, DateTime end)

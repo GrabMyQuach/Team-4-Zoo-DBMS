@@ -126,7 +126,7 @@ public class EditModel : PageModel
                 return Redirect($"/Animals/Details/{Id}");
             }
         }
-        catch (MySqlException ex) when (ex.SqlState == "45000")
+        catch (MySqlException ex)
         {
             // 45000 = a custom error thrown by a trigger with SIGNAL
             ErrorMessage = ex.Message;
