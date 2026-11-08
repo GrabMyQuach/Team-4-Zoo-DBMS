@@ -1,3 +1,4 @@
 {
-    "appService.deploySubpath": "ZooDatabase/bin/Release/net10.0/publish"
+    "appService.deploySubpath": "ZooDatabase/bin/Release/net10.0/publish",
+    "appService.defaultWebAppToDeploy": "/subscriptions/349d162b-2304-46b4-b1e7-02cb826237cb/resourceGroups/team4zoo/providers/Microsoft.Web/sites/ZooDatabase"
 }
