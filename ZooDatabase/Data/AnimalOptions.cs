@@ -11,7 +11,15 @@ public static class AnimalOptions
 
     public static bool CanEdit(ClaimsPrincipal user) =>
         EditorRoles.Split(',').Any(user.IsInRole);
+    public const string HealthEditorRoles = "DBA,SuperUser,Admin,Veterinarian";
 
+    public static bool CanRecordHealth(ClaimsPrincipal user) =>
+    HealthEditorRoles.Split(',').Any(user.IsInRole);
+
+    public static readonly string[] RecordTypes =
+    { "Routine Checkup", "Illness", "Injury", "Vaccination", "Follow-up", "Neonatal Exam" };
+
+    public static readonly string[] Severities = { "Low", "Moderate", "High", "Critical" };
     // Dropdown choices, so staff pick from a list instead of typing
     public static readonly string[] Genders = { "Male", "Female", "Unknown" };
 
