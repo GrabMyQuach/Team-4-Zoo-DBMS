@@ -29,6 +29,8 @@ public class DetailsModel : PageModel
 
     public bool CanEdit => AnimalOptions.CanEdit(User);
 
+    public bool CanRecordHealth => AnimalOptions.CanRecordHealth(User);
+    
     public async Task<IActionResult> OnGetAsync(int id)
     {
         await using var conn = new MySqlConnection(_config.GetConnectionString("ZooDb"));
