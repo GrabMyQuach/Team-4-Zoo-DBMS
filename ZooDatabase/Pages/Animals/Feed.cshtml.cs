@@ -1,8 +1,10 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using MySqlConnector;
 
 namespace ZooDatabase.Pages.Animals;
 
+[Authorize(Roles = "Zookeeper,Veterinarian,Admin,SuperUser,DBA")]
 public class FeedModel : PageModel
 {
     private readonly IConfiguration _config;

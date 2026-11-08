@@ -1,6 +1,8 @@
+
 @page
 @model IndexModel
 @using ZooDatabase.Data
+
 @{
     ViewData["Title"] = "Home";
 }
@@ -12,9 +14,33 @@
 <div class="row g-4">
     @foreach (var m in ZooModules.All)
     {
+        // Restrict modules based on the logged-in user's role
+        if (User.IsInRole("ReadOnly") &&
+            (m.Key == "Staff" || m.Key == "Finance"))
+        {
+            continue;
+        }
+
+        // Zookeeper and Veterinarian only see Animals
+        if ((User.IsInRole("Zookeeper") ||
+             User.IsInRole("Veterinarian")) &&
+            m.Key != "Animals")
+        {
+            continue;
+        }
+
+        // Cashier only sees the Tickets module
+        if (User.IsInRole("Cashier") &&
+            m.Key != "Tickets")
+        {
+            continue;
+        }
+
         <div class="col-sm-6 col-xl-3">
             <a href="/@m.Key" class="module-card">
-                <img src="/images/@m.Image" alt="@m.Title" class="module-card-img" />
+                <img src="/images/@m.Image"
+                     alt="@m.Title"
+                     class="module-card-img" />
                 <div class="module-card-title">@m.Title</div>
             </a>
         </div>
