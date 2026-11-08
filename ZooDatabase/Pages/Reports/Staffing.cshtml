@@ -1,0 +1,217 @@
+@page
+@model ZooDatabase.Pages.Reports.StaffingModel
+@{
+    ViewData["Title"] = "Staffing Report";
+    ViewData["ReportTitle"] = "Staffing & Labor";
+    ViewData["ReportFilters"] = Model.FilterText;
+    var maxHours = Model.Weeks.Count == 0 ? 1m : Math.Max(1m, Model.Weeks.Max(w => w.Hours));
+}
+
+<partial name="_ReportHeader" model="Model" />
+
+<!-- Filters -->
+<div class="card mb-4 no-print">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small text-muted mb-1">From</label>
+                <input type="date" name="From" value="@Model.StartDate.ToString("yyyy-MM-dd")" class="form-control" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small text-muted mb-1">To</label>
+                <input type="date" name="To" value="@Model.EndDate.ToString("yyyy-MM-dd")" class="form-control" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small text-muted mb-1">Department</label>
+                <select name="DepartmentId" class="form-select">
+                    <option value="">All departments</option>
+                    @foreach (var o in Model.DepartmentOptions)
+                    {
+                        <option value="@o.Id" selected="@(Model.DepartmentId == o.Id)">@o.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-primary rounded-pill px-4">Run</button>
+                <a href="/Reports/Staffing" class="btn btn-link px-1">Reset</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Headline numbers -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Hours worked</div>
+            <div class="stat-value">@Model.Hours.ToString("N0")</div>
+            <div class="small text-muted">@Model.ShiftsWorked shifts · @Model.StaffWorking staff</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Labor cost</div>
+            <div class="stat-value">@Model.LaborCost.ToString("C0")</div>
+            <div class="small text-muted">@((Model.Hours == 0 ? 0 : Model.LaborCost / Model.Hours).ToString("C2")) per hour</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Absence rate</div>
+            <div class="stat-value @(Model.AbsenceRate >= 10 ? "text-danger" : "")">@Model.AbsenceRate%</div>
+            <div class="small text-muted">@Model.Absences missed shifts</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Overtime</div>
+            <div class="stat-value @(Model.OvertimeHours > 0 ? "text-warning" : "")">@Model.OvertimeHours.ToString("0.#") hrs</div>
+            <div class="small text-muted">@Model.Overtime.Select(o => o.EmployeeId).Distinct().Count() staff over 40 hrs in a week</div>
+        </div></div>
+    </div>
+</div>
+
+<!-- Coverage for the coming week -->
+<div class="card mb-4">
+    <div class="card-body pb-0">
+        <h2 class="h5 section-heading">Coverage, Next 7 Days</h2>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0 text-center">
+            <thead class="table-light">
+                <tr>
+                    <th class="text-start">Department</th>
+                    <th>Usual / Day</th>
+                    @foreach (var d in Model.NextDays)
+                    {
+                        <th>@d.ToString("ddd")<div class="small fw-normal text-muted">@d.ToString("MMM d")</div></th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var c in Model.Coverage)
+                {
+                    <tr>
+                        <td class="text-start fw-semibold">@c.Department</td>
+                        <td>@c.UsualDaily.ToString("0.#")</td>
+                        @foreach (var n in c.Scheduled)
+                        {
+                            <td class="@(c.IsShort(n) ? "table-danger fw-semibold" : "")">@n</td>
+                        }
+                    </tr>
+                }
+                @if (Model.Coverage.Count == 0)
+                {
+                    <tr><td colspan="9" class="text-muted py-3">No shifts scheduled.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- By department -->
+<div class="card mb-4">
+    <div class="card-body pb-0">
+        <h2 class="h5 section-heading">By Department</h2>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr><th>Department</th><th class="text-end">Staff</th><th class="text-end">Hours</th><th class="text-end">Hours / Person</th><th class="text-end">Absence Rate</th><th class="text-end">Labor Cost</th><th class="text-end">Cost / Hour</th><th class="text-end">Open Tasks</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var d in Model.ByDepartment)
+                {
+                    <tr class="@(d.AbsenceRate >= 10 ? "table-warning" : "")">
+                        <td class="fw-semibold">@d.Name</td>
+                        <td class="text-end">@d.Staff</td>
+                        <td class="text-end">@d.Hours.ToString("N0")</td>
+                        <td class="text-end">@d.HoursPerPerson.ToString("0.#")</td>
+                        <td class="text-end">@d.AbsenceRate%</td>
+                        <td class="text-end">@d.Cost.ToString("C0")</td>
+                        <td class="text-end">@d.CostPerHour.ToString("C2")</td>
+                        <td class="text-end">@d.OpenTasks</td>
+                    </tr>
+                }
+                @if (Model.ByDepartment.Count == 0)
+                {
+                    <tr><td colspan="8" class="text-center text-muted py-3">No shifts in this period.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- Weekly trend -->
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-body pb-0"><h2 class="h5 section-heading">Weekly Trend</h2></div>
+            <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                    <tr><th>Week of</th><th style="width: 30%;">Hours</th><th class="text-end"></th><th class="text-end">Absences</th><th class="text-end">Labor Cost</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var w in Model.Weeks)
+                    {
+                        <tr>
+                            <td>@w.WeekStart.ToString("MMM d")</td>
+                            <td><div class="mini-bar"><div class="mini-bar-fill" style="width: @((int)(w.Hours * 100 / maxHours))%;"></div></div></td>
+                            <td class="text-end">@w.Hours.ToString("N0")</td>
+                            <td class="text-end @(w.AbsenceRate >= 10 ? "text-danger fw-semibold" : "")">@w.Absences</td>
+                            <td class="text-end">@w.Cost.ToString("C0")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Absence reasons -->
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-body pb-0"><h2 class="h5 section-heading">Absence Reasons</h2></div>
+            <table class="table table-sm align-middle mb-0">
+                <tbody>
+                    @foreach (var a in Model.Reasons)
+                    {
+                        <tr><td>@a.Reason</td><td class="text-end fw-semibold">@a.Count</td></tr>
+                    }
+                    @if (Model.Reasons.Count == 0)
+                    {
+                        <tr><td class="text-center text-muted py-3">No absences in this period.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Workload by employee -->
+<div class="card">
+    <div class="card-body pb-0">
+        <h2 class="h5 section-heading">Workload by Employee</h2>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr><th>Employee</th><th>Department</th><th class="text-end">Shifts</th><th class="text-end">Hours</th><th class="text-end">Overtime Weeks</th><th class="text-end">Absences</th><th class="text-end">Open Tasks</th><th class="text-end">Labor Cost</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var p in Model.People)
+                {
+                    <tr class="clickable-row @(p.Absences >= 3 || p.OvertimeWeeks > 0 ? "table-warning" : "")" onclick="location.href='/Staff/EmployeeDetails/@p.EmployeeId'">
+                        <td><span class="fw-semibold">@p.Name</span><div class="small text-muted">@p.Job</div></td>
+                        <td>@p.Department</td>
+                        <td class="text-end">@p.Shifts</td>
+                        <td class="text-end">@p.Hours.ToString("0.#")</td>
+                        <td class="text-end">@p.OvertimeWeeks</td>
+                        <td class="text-end">@p.Absences</td>
+                        <td class="text-end">@p.OpenTasks</td>
+                        <td class="text-end">@p.Cost.ToString("C0")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

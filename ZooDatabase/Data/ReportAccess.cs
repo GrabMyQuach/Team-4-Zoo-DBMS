@@ -15,6 +15,9 @@ public static class ReportAccess
     // Facility safety and repair costs are a management concern.
     public const string HabitatSafety = "DBA,SuperUser";
 
+    // Labor cost and staff attendance are a management concern.
+    public const string Staffing = "DBA,SuperUser";
+
     // Anyone who can see at least one report (used for the Reports link and overview page)
     public const string AnyReport = "DBA,SuperUser,Veterinarian,Zookeeper";
 

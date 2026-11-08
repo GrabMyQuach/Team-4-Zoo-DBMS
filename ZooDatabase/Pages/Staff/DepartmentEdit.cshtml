@@ -1,0 +1,54 @@
+@page "{id:int?}"
+@model ZooDatabase.Pages.Staff.DepartmentEditModel
+@{
+    string title = Model.IsNew ? "Add Department" : "Edit " + Model.Input.Name;
+    ViewData["Title"] = title;
+    string cancelUrl = Model.IsNew ? "/Staff/Departments" : $"/Staff/DepartmentDetails/{Model.Id}";
+}
+
+<a href="@cancelUrl" class="back-link mt-0 mb-3 d-inline-block">← Back</a>
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">@title</h1>
+</div>
+
+<div class="card" style="max-width: 640px;">
+    <div class="card-body p-4">
+        @if (Model.ErrorMessage != null)
+        {
+            <div class="alert alert-danger py-2">@Model.ErrorMessage</div>
+        }
+
+        <form method="post">
+            <div class="row g-3 mb-4">
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Department name *</label>
+                    <input asp-for="Input.Name" class="form-control" maxlength="100" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Location</label>
+                    <input asp-for="Input.Location" class="form-control" placeholder="e.g. Admin Building" maxlength="100" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Phone</label>
+                    <input asp-for="Input.Phone" class="form-control" maxlength="20" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Manager</label>
+                    <select asp-for="Input.ManagerId" class="form-select">
+                        <option value="0">No manager</option>
+                        @foreach (var m in Model.ManagerOptions)
+                        {
+                            <option value="@m.Id">@m.Label</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary rounded-pill px-4">@(Model.IsNew ? "Add Department" : "Save Changes")</button>
+                <a href="@cancelUrl" class="btn btn-link">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>

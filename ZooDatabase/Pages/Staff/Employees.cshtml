@@ -1,27 +1,57 @@
 @page
 @model ZooDatabase.Pages.Staff.EmployeesModel
+@using ZooDatabase.Data
 @{
     ViewData["Title"] = "Employees";
+    bool filtered = !string.IsNullOrWhiteSpace(Model.Search) || Model.DepartmentId != null || !string.IsNullOrEmpty(Model.Specialty);
 }
 
 <div class="border-bottom pb-3 mb-4">
     <h1 class="h2 mb-0">Employees</h1>
 </div>
 
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h2 class="h5 mb-0">@Model.Rows.Count employees</h2>
-    @if (!User.IsInRole("ReadOnly"))
+    @if (Model.CanEdit)
     {
-        <a href="/Staff/EmployeeManage" class="btn btn-primary rounded-pill px-4">Manage Employees</a>
+        <a href="/Staff/EmployeeEdit" class="btn btn-primary rounded-pill px-4">+ Add Employee</a>
     }
 </div>
 
 <div class="card">
     <div class="card-body border-bottom">
-        <form method="get" class="d-flex gap-2" style="max-width: 480px;">
-            <input type="text" name="Search" value="@Model.Search" class="form-control"
-                   placeholder="Search name, job, or department" />
-            <button type="submit" class="btn btn-outline-secondary rounded-pill px-4">Search</button>
+        <form method="get" class="row g-2 align-items-center">
+            <div class="col-md-5">
+                <input type="text" name="Search" value="@Model.Search" class="form-control" placeholder="Search name or job" />
+            </div>
+            <div class="col-md-3">
+                <select name="DepartmentId" class="form-select">
+                    <option value="">All departments</option>
+                    @foreach (var d in Model.Departments)
+                    {
+                        <option value="@d.Id" selected="@(Model.DepartmentId == d.Id)">@d.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select name="Specialty" class="form-select">
+                    <option value="">All staff</option>
+                    <option value="Keeper" selected="@(Model.Specialty == "Keeper")">Keepers</option>
+                    <option value="Veterinarian" selected="@(Model.Specialty == "Veterinarian")">Veterinarians</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-outline-secondary rounded-pill px-3">Filter</button>
+                @if (filtered)
+                {
+                    <a href="/Staff/Employees" class="btn btn-link px-1">Clear</a>
+                }
+            </div>
         </form>
     </div>
 
@@ -33,16 +63,16 @@
                     <th>Job</th>
                     <th>Department</th>
                     <th>Type</th>
-                    <th>Hired</th>
-                    <th>Phone</th>
+                    <th>With Zoo</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var e in Model.Rows)
                 {
-                    <tr>
+                    <tr class="clickable-row" onclick="location.href='/Staff/EmployeeDetails/@e.EmployeeId'">
                         <td>
-                            <span class="fw-semibold">@e.Name</span>
+                            <a href="/Staff/EmployeeDetails/@e.EmployeeId" class="fw-semibold text-decoration-none text-dark">@e.Name</a>
                             @if (e.Specialty != null)
                             {
                                 <span class="badge bg-success ms-1">@e.Specialty</span>
@@ -51,16 +81,13 @@
                         <td>@e.JobPosition</td>
                         <td>@e.Department</td>
                         <td>@e.EmploymentType</td>
-                        <td>@(e.HireDate?.ToString("MMM d, yyyy") ?? "—")</td>
-                        <td>@e.Phone</td>
+                        <td>@StaffOptions.YearsText(e.HireDate)</td>
+                        <td class="text-end text-muted">›</td>
                     </tr>
                 }
-
                 @if (Model.Rows.Count == 0)
                 {
-                    <tr>
-                        <td colspan="6" class="text-center text-muted py-4">No employees found.</td>
-                    </tr>
+                    <tr><td colspan="6" class="text-center text-muted py-4">No employees found.</td></tr>
                 }
             </tbody>
         </table>

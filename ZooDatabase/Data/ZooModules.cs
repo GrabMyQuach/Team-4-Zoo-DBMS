@@ -9,7 +9,7 @@ public static class ZooModules
 {
     public static readonly ZooModule[] All =
     {
-        new("Animals", "Animals", "🦁","card-animals.png", "Animals, species, enclosures, and feeding", new ModuleSection[]
+        new("Animals", "Animals", "", "card-animals.png", "Animals, species, enclosures, and feeding", new ModuleSection[]
         {
             new("Animals", "Animals"),
             new("Species", "Species"),
@@ -17,17 +17,16 @@ public static class ZooModules
             new("Feed", "Feed")
         }),
 
-        new("Staff", "Staff & Operations", "👷","card-staff.png", "Employees, departments, and maintenance", new ModuleSection[]
+        new("Staff", "Staff & Operations", "", "card-staff.png", "Employees, departments, and maintenance", new ModuleSection[]
         {
             new("Employees", "Employees"),
-            new("Manage Employees", "EmployeeManage"),
             new("Departments", "Departments"),
             new("Keepers", "Keepers"),
             new("Veterinarians", "Veterinarians"),
             new("Maintenance", "Maintenance")
         }),
 
-        new("Tickets", "Tickets & Memberships", "🎟️","card-tickets.webp", "Ticket sales, customers, and attractions", new ModuleSection[]
+        new("Tickets", "Tickets & Memberships", "", "card-tickets.webp", "Ticket sales, customers, and attractions", new ModuleSection[]
         {
             new("Ticket Sales", "TicketSales"),
             new("Ticket Types", "TicketTypes"),
@@ -36,7 +35,7 @@ public static class ZooModules
             new("Attractions", "Attractions")
         }),
 
-        new("Shop", "Food & Gift Shop", "🛍️","card-shop.png", "Food stands, gift shops, inventory, and sales", new ModuleSection[]
+        new("Shop", "Food & Gift Shop", "", "card-shop.png", "Food stands, gift shops, inventory, and sales", new ModuleSection[]
         {
             new("Food Stands", "FoodStands"),
             new("Menu Items", "MenuItems"),

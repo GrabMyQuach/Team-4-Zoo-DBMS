@@ -1,0 +1,247 @@
+@page "{id:int}"
+@model ZooDatabase.Pages.Staff.EmployeeDetailsModel
+@using ZooDatabase.Data
+@{
+    var e = Model.Emp;
+    ViewData["Title"] = e.Name;
+    string Time(TimeSpan t) => DateTime.Today.Add(t).ToString("h:mm tt");
+}
+
+<a href="/Staff/Employees" class="back-link mt-0 mb-3 d-inline-block">← All employees</a>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+
+<div class="border-bottom pb-3 mb-4 d-flex flex-wrap justify-content-between align-items-end gap-3">
+    <div>
+        <h1 class="h2 mb-1">
+            @e.Name
+            @if (e.IsKeeper)
+            {
+                <span class="badge bg-success fs-6 align-middle">Keeper</span>
+            }
+            @if (e.IsVet)
+            {
+                <span class="badge bg-success fs-6 align-middle">Veterinarian</span>
+            }
+            @if (e.IsManager)
+            {
+                <span class="badge bg-light text-dark border fs-6 align-middle">Department Manager</span>
+            }
+        </h1>
+        <div class="text-muted">
+            @(e.JobPosition ?? "No job title")
+            @if (e.DepartmentId != null)
+            {
+                <span>· <a href="/Staff/DepartmentDetails/@e.DepartmentId">@e.Department</a></span>
+            }
+        </div>
+    </div>
+    @if (Model.CanEdit)
+    {
+        <a href="/Staff/EmployeeEdit/@Model.Id" class="btn btn-primary rounded-pill px-4">Edit</a>
+    }
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Hours, last 30 days</div>
+            <div class="stat-value">@Model.HoursLast30</div>
+            <div class="small text-muted">@Model.ShiftsLast30 shifts worked</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Absences, last 30 days</div>
+            <div class="stat-value @(Model.AbsencesLast30 >= 3 ? "text-danger" : "")">@Model.AbsencesLast30</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            <div class="stat-label">Open tasks</div>
+            <div class="stat-value @(Model.OpenTasks.Any(t => t.Priority == "Urgent") ? "text-danger" : "")">@Model.OpenTasks.Count</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100"><div class="card-body">
+            @if (e.IsVet)
+            {
+                <div class="stat-label">Exams, last 90 days</div>
+                <div class="stat-value">@Model.ExamsLast90</div>
+            }
+            else if (e.IsKeeper)
+            {
+                <div class="stat-label">Feedings logged, 30 days</div>
+                <div class="stat-value">@Model.FeedingsLoggedLast30</div>
+            }
+            else
+            {
+                <div class="stat-label">With the zoo</div>
+                <div class="stat-value">@StaffOptions.YearsText(e.HireDate)</div>
+            }
+        </div></div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-body p-4">
+                <h2 class="h5 section-heading">Job Info</h2>
+                <dl class="row detail-list mb-0">
+                    <dt class="col-sm-5">Department</dt>
+                    <dd class="col-sm-7">@(e.Department ?? "—")</dd>
+                    <dt class="col-sm-5">Employment type</dt>
+                    <dd class="col-sm-7">@(e.EmploymentType ?? "—")</dd>
+                    <dt class="col-sm-5">Hired</dt>
+                    <dd class="col-sm-7">@(e.HireDate?.ToString("MMM d, yyyy") ?? "—") <span class="text-muted small">(@StaffOptions.YearsText(e.HireDate))</span></dd>
+                    @if (e.IsKeeper)
+                    {
+                        <dt class="col-sm-5">Experience level</dt>
+                        <dd class="col-sm-7">@(e.ExperienceLevel ?? "—")</dd>
+                    }
+                    @if (e.IsVet)
+                    {
+                        <dt class="col-sm-5">Specialization</dt>
+                        <dd class="col-sm-7">@(e.Specialization ?? "—")</dd>
+                    }
+                    <dt class="col-sm-5">Phone</dt>
+                    <dd class="col-sm-7">@(e.Phone ?? "—")</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    @if (Model.CanSeePrivate)
+    {
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-body p-4">
+                    <h2 class="h5 section-heading">Private Info</h2>
+                    <dl class="row detail-list mb-0">
+                        <dt class="col-sm-5">SSN</dt>
+                        <dd class="col-sm-7">@StaffOptions.MaskSsn(e.Ssn)</dd>
+                        <dt class="col-sm-5">Pay</dt>
+                        <dd class="col-sm-7">
+                            @if (e.PayRate == null)
+                            {
+                                <span>—</span>
+                            }
+                            else
+                            {
+                                <span>@e.PayRate.Value.ToString("C")</span> <span class="text-muted small">@e.PayType</span>
+                            }
+                        </dd>
+                        <dt class="col-sm-5">Address</dt>
+                        <dd class="col-sm-7">@(e.Address ?? "—")</dd>
+                        <dt class="col-sm-5">Gender</dt>
+                        <dd class="col-sm-7">@(e.Gender ?? "—")</dd>
+                        <dt class="col-sm-5">Login account</dt>
+                        <dd class="col-sm-7">@(e.Login ?? "None")</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (e.IsKeeper)
+    {
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-body pb-0"><h2 class="h5 section-heading">Assigned Enclosures</h2></div>
+                <table class="table table-hover align-middle mb-0">
+                    <tbody>
+                        @foreach (var en in Model.Enclosures)
+                        {
+                            <tr class="clickable-row" onclick="location.href='/Animals/EnclosureDetails/@en.Id'">
+                                <td class="fw-semibold">@en.Name</td>
+                                <td class="text-muted small">@en.Info</td>
+                            </tr>
+                        }
+                        @if (Model.Enclosures.Count == 0)
+                        {
+                            <tr><td class="text-center text-muted py-3">Not assigned to any enclosure.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    @if (e.IsVet)
+    {
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-body pb-0"><h2 class="h5 section-heading">Animals Under Care</h2></div>
+                <table class="table table-hover align-middle mb-0">
+                    <tbody>
+                        @foreach (var an in Model.Animals)
+                        {
+                            <tr class="clickable-row" onclick="location.href='/Animals/Details/@an.Id'">
+                                <td class="fw-semibold">@an.Name</td>
+                                <td class="text-muted small">@an.Info</td>
+                            </tr>
+                        }
+                        @if (Model.Animals.Count == 0)
+                        {
+                            <tr><td class="text-center text-muted py-3">No animals assigned.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-body pb-0"><h2 class="h5 section-heading">Open Tasks</h2></div>
+            <table class="table align-middle mb-0">
+                <tbody>
+                    @foreach (var t in Model.OpenTasks)
+                    {
+                        <tr class="@(t.Priority == "Urgent" ? "table-danger" : t.Priority == "High" ? "table-warning" : "")">
+                            <td>
+                                <span class="fw-semibold">@t.Title</span>
+                                <div class="small text-muted">@t.Category · @t.Priority</div>
+                            </td>
+                            <td class="text-end small">@(t.Due?.ToString("MMM d, h:mm tt") ?? "")</td>
+                        </tr>
+                    }
+                    @if (Model.OpenTasks.Count == 0)
+                    {
+                        <tr><td class="text-center text-muted py-3">No open tasks.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-body pb-0"><h2 class="h5 section-heading">Recent and Upcoming Shifts</h2></div>
+            <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                    <tr><th>Date</th><th>Time</th><th class="text-end">Hours</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in Model.Shifts)
+                    {
+                        <tr class="@(s.Status == "Absent" ? "table-warning" : "")">
+                            <td>@s.Date.ToString("ddd, MMM d")</td>
+                            <td>@Time(s.Start) - @Time(s.End)</td>
+                            <td class="text-end">@s.Hours.ToString("0.#")</td>
+                            <td>@s.Status @if (s.Reason != null) { <span class="small text-muted">(@s.Reason)</span> }</td>
+                        </tr>
+                    }
+                    @if (Model.Shifts.Count == 0)
+                    {
+                        <tr><td colspan="4" class="text-center text-muted py-3">No shifts in the last 2 weeks.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
