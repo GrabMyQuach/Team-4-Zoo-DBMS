@@ -23,11 +23,12 @@ create table Customer
 
 create table Department
 (
-    Department_ID   int auto_increment
+    Department_ID       int auto_increment
         primary key,
-    Department_Name varchar(100) not null,
-    Location        varchar(100) null,
-    Phone_Number    varchar(20)  null
+    Department_Name     varchar(100) not null,
+    Location            varchar(100) null,
+    Phone_Number        varchar(20)  null,
+    Manager_Employee_ID int          null
 );
 
 create table Employee
@@ -54,6 +55,11 @@ create table Employee
             on update cascade on delete set null
 );
 
+alter table Department
+    add constraint fk_department_manager
+        foreign key (Manager_Employee_ID) references Employee (Employee_ID)
+            on update cascade on delete set null;
+
 create index Department_ID
     on Employee (Department_ID);
 
@@ -74,6 +80,55 @@ create table Employee_Attraction
 
 create index Attraction_ID
     on Employee_Attraction (Attraction_ID);
+
+create table Employee_Shift
+(
+    Shift_ID       int auto_increment
+        primary key,
+    Employee_ID    int                                                        not null,
+    Department_ID  int                                                        null,
+    Shift_Date     date                                                       not null,
+    Start_Time     time                                                       not null,
+    End_Time       time                                                       not null,
+    Hours          decimal(5, 2) as ((time_to_sec(timediff(`End_Time`, `Start_Time`)) / 3600)) stored,
+    Status         enum ('Scheduled', 'Worked', 'Absent') default 'Scheduled' not null,
+    Absence_Reason varchar(100)                                               null,
+    constraint uq_shift
+        unique (Employee_ID, Shift_Date, Start_Time),
+    constraint fk_shift_department
+        foreign key (Department_ID) references Department (Department_ID)
+            on update cascade on delete set null,
+    constraint fk_shift_employee
+        foreign key (Employee_ID) references Employee (Employee_ID)
+            on update cascade on delete cascade,
+    constraint chk_shift_times
+        check (`End_Time` > `Start_Time`)
+);
+
+create index idx_shift_day
+    on Employee_Shift (Shift_Date, Department_ID);
+
+create definer = avnadmin@`%` trigger trg_shift_absent_insert
+    after insert
+    on Employee_Shift
+    for each row
+BEGIN
+    IF NEW.Status = 'Absent' THEN
+        CALL sp_reassign_for_absence(NEW.Employee_ID, NEW.Shift_Date,
+                                     COALESCE(NEW.Department_ID, (SELECT Department_ID FROM Employee WHERE Employee_ID = NEW.Employee_ID)));
+    END IF;
+END;
+
+create definer = avnadmin@`%` trigger trg_shift_absent_update
+    after update
+    on Employee_Shift
+    for each row
+BEGIN
+    IF NEW.Status = 'Absent' AND NOT (OLD.Status <=> 'Absent') THEN
+        CALL sp_reassign_for_absence(NEW.Employee_ID, NEW.Shift_Date,
+                                     COALESCE(NEW.Department_ID, (SELECT Department_ID FROM Employee WHERE Employee_ID = NEW.Employee_ID)));
+    END IF;
+END;
 
 create table Enclosure
 (
@@ -649,6 +704,28 @@ BEGIN
     END IF;
 END;
 
+create definer = avnadmin@`%` trigger trg_auto_feeding_schedule
+    after insert
+    on Animal
+    for each row
+BEGIN
+    IF NEW.Is_Active = 1 AND NEW.Breeding_ID IS NULL THEN
+        INSERT INTO Feeding_Schedule (Animal_ID, Feed_ID, Keeper_Employee_ID, Feeding_Time, Quantity, Unit,
+                                      Special_Instructions)
+        SELECT NEW.Animal_ID, sf.Feed_ID,
+               (SELECT ke.Employee_ID FROM Keeper_Enclosure ke
+                WHERE ke.Enclosure_ID = NEW.Enclosure_ID
+                  AND (ke.Assignment_End_Date IS NULL OR ke.Assignment_End_Date >= CURDATE())
+                ORDER BY ke.Assignment_Start_Date, ke.Employee_ID LIMIT 1),
+               '09:00:00', sf.Daily_Quantity, f.Unit,
+               'Auto-created from species diet plan; adjust time and amount as needed.'
+        FROM Species_Feed sf
+                 JOIN Feed f ON f.Feed_ID = sf.Feed_ID
+        WHERE sf.Species_ID = NEW.Species_ID
+          AND sf.Daily_Quantity IS NOT NULL;
+    END IF;
+END;
+
 create definer = avnadmin@`%` trigger trg_offspring_born
     after insert
     on Animal
@@ -662,17 +739,17 @@ BEGIN
 
     IF NEW.Breeding_ID IS NOT NULL THEN
         SET v_born = COALESCE(NEW.Date_of_Birth, CURDATE());
-        SET v_vet = fn_least_busy_vet();
+        SET v_vet = fn_vet_for_animal(NEW.Mother_ID);  -- mother's vet takes the newborn
 
-        SELECT Program_ID INTO v_program FROM Breeding_Event WHERE Breeding_ID = NEW.Breeding_ID;
+        SET v_program = (SELECT Program_ID FROM Breeding_Event WHERE Breeding_ID = NEW.Breeding_ID);
         IF v_program IS NULL THEN
-            SELECT Program_ID INTO v_program FROM Conservation_Program
-            WHERE Species_ID = NEW.Species_ID AND Status = 'Active'
-            ORDER BY Start_Date LIMIT 1;
+            SET v_program = (SELECT Program_ID FROM Conservation_Program
+                             WHERE Species_ID = NEW.Species_ID AND Status = 'Active'
+                             ORDER BY Start_Date LIMIT 1);
         END IF;
 
-        SELECT Animal_Name INTO v_dam_name FROM Animal WHERE Animal_ID = NEW.Mother_ID;
-        SELECT Animal_Name INTO v_sire_name FROM Animal WHERE Animal_ID = NEW.Father_ID;
+        SET v_dam_name = (SELECT Animal_Name FROM Animal WHERE Animal_ID = NEW.Mother_ID);
+        SET v_sire_name = (SELECT Animal_Name FROM Animal WHERE Animal_ID = NEW.Father_ID);
 
         UPDATE Breeding_Event
         SET Outcome = 'Offspring Born',
@@ -683,6 +760,11 @@ BEGIN
         INSERT INTO Conservation_Record (Animal_ID, Program_ID, Breeding_ID, Enrollment_Date, Status, Genetic_Notes)
         VALUES (NEW.Animal_ID, v_program, NEW.Breeding_ID, CURDATE(), 'Enrolled',
                 CONCAT('Dam: ', COALESCE(v_dam_name, 'unknown'), '; Sire: ', COALESCE(v_sire_name, 'unknown')));
+
+        IF v_vet IS NOT NULL THEN
+            INSERT INTO Animal_Employee (Employee_ID, Animal_ID, Assigned_Role)
+            VALUES (v_vet, NEW.Animal_ID, 'Primary Vet');
+        END IF;
 
         INSERT INTO Care_Task (Animal_ID, Enclosure_ID, Task_Category, Title, Description, Priority,
                                Assigned_Employee_ID, Due_At, Source_Type, Source_ID)
@@ -746,23 +828,65 @@ create table Animal_Employee
 create index Animal_ID
     on Animal_Employee (Animal_ID);
 
+create table Animal_Encounter
+(
+    Encounter_ID        int auto_increment
+        primary key,
+    Animal_ID           int                                                              not null,
+    Attraction_ID       int                                                              null,
+    Handler_Employee_ID int                                                              null,
+    Scheduled_Start     datetime                                                         not null,
+    Duration_Minutes    int                                          default 30          not null,
+    Max_Guests          int                                                              null,
+    Guests_Attended     int                                                              null,
+    Status              enum ('Scheduled', 'Completed', 'Cancelled') default 'Scheduled' not null,
+    Cancel_Reason       varchar(255)                                                     null,
+    constraint fk_encounter_animal
+        foreign key (Animal_ID) references Animal (Animal_ID)
+            on update cascade on delete cascade,
+    constraint fk_encounter_attraction
+        foreign key (Attraction_ID) references Attraction (Attraction_ID)
+            on update cascade on delete set null,
+    constraint fk_encounter_handler
+        foreign key (Handler_Employee_ID) references Employee (Employee_ID)
+            on update cascade on delete set null
+);
+
+create index idx_encounter_animal
+    on Animal_Encounter (Animal_ID, Status, Scheduled_Start);
+
+create index idx_encounter_start
+    on Animal_Encounter (Scheduled_Start);
+
+create definer = avnadmin@`%` trigger trg_encounter_guard
+    before insert
+    on Animal_Encounter
+    for each row
+BEGIN
+    IF EXISTS (SELECT 1 FROM Animal
+               WHERE Animal_ID = NEW.Animal_ID
+                 AND (Public_Encounter_Eligible = 0 OR Needs_Relocation = 1 OR Is_Active = 0)) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Animal is not cleared for public encounters';
+    END IF;
+END;
+
 create table Care_Task
 (
     Task_ID              int auto_increment
         primary key,
-    Animal_ID            int                                                                              null,
-    Enclosure_ID         int                                                                              null,
-    Task_Category        enum ('Veterinary', 'Feeding', 'Relocation', 'Inspection', 'Conservation')       not null,
-    Title                varchar(150)                                                                     not null,
-    Description          varchar(500)                                                                     null,
-    Priority             enum ('Low', 'Normal', 'High', 'Urgent')               default 'Normal'          not null,
-    Assigned_Employee_ID int                                                                              null,
-    Due_At               datetime                                                                         null,
-    Status               enum ('Open', 'In Progress', 'Completed', 'Cancelled') default 'Open'            not null,
-    Source_Type          varchar(30)                                                                      null,
-    Source_ID            int                                                                              null,
-    Created_At           datetime                                               default CURRENT_TIMESTAMP not null,
-    Completed_At         datetime                                                                         null,
+    Animal_ID            int                                                                                  null,
+    Enclosure_ID         int                                                                                  null,
+    Task_Category        enum ('Veterinary', 'Feeding', 'Relocation', 'Inspection', 'Conservation', 'Supply') not null,
+    Title                varchar(150)                                                                         not null,
+    Description          varchar(500)                                                                         null,
+    Priority             enum ('Low', 'Normal', 'High', 'Urgent')               default 'Normal'              not null,
+    Assigned_Employee_ID int                                                                                  null,
+    Due_At               datetime                                                                             null,
+    Status               enum ('Open', 'In Progress', 'Completed', 'Cancelled') default 'Open'                not null,
+    Source_Type          varchar(30)                                                                          null,
+    Source_ID            int                                                                                  null,
+    Created_At           datetime                                               default CURRENT_TIMESTAMP     not null,
+    Completed_At         datetime                                                                             null,
     constraint fk_task_animal
         foreign key (Animal_ID) references Animal (Animal_ID)
             on update cascade on delete cascade,
@@ -886,12 +1010,15 @@ create table Feed
 (
     Feed_ID           int auto_increment
         primary key,
-    Feed_Name         varchar(100)   not null,
-    Feed_Type         varchar(50)    null,
-    Supplier_ID       int            null,
-    Quantity_In_Stock decimal(10, 2) null,
-    Storage_Location  varchar(100)   null,
-    Expiration_Date   date           null,
+    Feed_Name         varchar(100)                not null,
+    Feed_Type         varchar(50)                 null,
+    Supplier_ID       int                         null,
+    Quantity_In_Stock decimal(10, 2)              null,
+    Storage_Location  varchar(100)                null,
+    Expiration_Date   date                        null,
+    Unit              varchar(20)    default 'kg' not null,
+    Reorder_Level     decimal(10, 2) default 0.00 not null,
+    Unit_Cost         decimal(10, 2)              null,
     constraint feed_ibfk_1
         foreign key (Supplier_ID) references Supplier (Supplier_ID)
 );
@@ -942,6 +1069,26 @@ create table Feeding_Log
         foreign key (Schedule_ID) references Feeding_Schedule (Schedule_ID)
             on update cascade on delete cascade
 );
+
+create definer = avnadmin@`%` trigger trg_feeding_consumption
+    after insert
+    on Feeding_Log
+    for each row
+BEGIN
+    DECLARE v_feed INT;
+    DECLARE v_qty DECIMAL(10, 2);
+
+    IF NEW.Status IN ('Completed', 'Partial') THEN
+        SELECT Feed_ID, COALESCE(NEW.Quantity_Given, Quantity) INTO v_feed, v_qty
+        FROM Feeding_Schedule WHERE Schedule_ID = NEW.Schedule_ID;
+
+        UPDATE Feed
+        SET Quantity_In_Stock = GREATEST(COALESCE(Quantity_In_Stock, 0) - v_qty, 0)
+        WHERE Feed_ID = v_feed;
+
+        CALL sp_check_feed_stock(v_feed);
+    END IF;
+END;
 
 create definer = avnadmin@`%` trigger trg_feeding_problem
     after insert
@@ -995,8 +1142,65 @@ BEGIN
             VALUES (v_animal, v_enclosure, 'Veterinary',
                     CONCAT('Appetite/welfare check: ', v_name),
                     CONCAT(v_problems, ' missed or refused feedings in the last 3 days.'),
-                    'High', fn_least_busy_vet(), NOW() + INTERVAL 1 DAY, 'Feeding_Log', NEW.Feeding_Log_ID);
+                    'High', fn_vet_for_animal(v_animal), NOW() + INTERVAL 1 DAY, 'Feeding_Log', NEW.Feeding_Log_ID);
         END IF;
+    END IF;
+END;
+
+create table Purchase_Order
+(
+    PO_ID             int auto_increment
+        primary key,
+    Supplier_ID       int                                                                    null,
+    Feed_ID           int                                                                    null,
+    Product_ID        int                                                                    null,
+    Quantity          decimal(10, 2)                                                         not null,
+    Unit_Cost         decimal(10, 2)                                                         null,
+    Total_Cost        decimal(12, 2) as ((`Quantity` * `Unit_Cost`)) stored,
+    Order_Date        date                                               default (curdate()) not null,
+    Expected_Delivery date                                                                   null,
+    Received_Date     date                                                                   null,
+    Status            enum ('Draft', 'Ordered', 'Received', 'Cancelled') default 'Draft'     not null,
+    Auto_Generated    tinyint(1)                                         default 0           not null,
+    constraint fk_po_feed
+        foreign key (Feed_ID) references Feed (Feed_ID),
+    constraint fk_po_product
+        foreign key (Product_ID) references Product (Product_ID),
+    constraint fk_po_supplier
+        foreign key (Supplier_ID) references Supplier (Supplier_ID)
+            on update cascade on delete set null,
+    constraint chk_po_one_item
+        check ((`Feed_ID` is null) <> (`Product_ID` is null)),
+    constraint chk_po_quantity
+        check (`Quantity` > 0)
+);
+
+create index idx_po_status
+    on Purchase_Order (Status, Order_Date);
+
+create definer = avnadmin@`%` trigger trg_purchase_received
+    before update
+    on Purchase_Order
+    for each row
+BEGIN
+    IF NEW.Status = 'Received' AND NOT (OLD.Status <=> 'Received') THEN
+        SET NEW.Received_Date = COALESCE(NEW.Received_Date, CURDATE());
+
+        IF NEW.Feed_ID IS NOT NULL THEN
+            UPDATE Feed
+            SET Quantity_In_Stock = COALESCE(Quantity_In_Stock, 0) + NEW.Quantity,
+                Unit_Cost = COALESCE(NEW.Unit_Cost, Unit_Cost)
+            WHERE Feed_ID = NEW.Feed_ID;
+        ELSE
+            UPDATE Inventory
+            SET Quantity_In_Stock = Quantity_In_Stock + NEW.Quantity, Last_Updated = NOW()
+            WHERE Product_ID = NEW.Product_ID;
+        END IF;
+
+        UPDATE Care_Task
+        SET Status = 'Completed', Completed_At = NOW()
+        WHERE Source_Type = 'Purchase_Order' AND Source_ID = NEW.PO_ID
+          AND Status IN ('Open', 'In Progress');
     END IF;
 END;
 
@@ -1044,6 +1248,7 @@ create table Ticket_Sale
     Purchase_Date     datetime default CURRENT_TIMESTAMP not null,
     Total_Amount      decimal(10, 2)                     not null,
     Payment_Method    varchar(50)                        null,
+    Visit_Date        date     default (curdate())       not null,
     constraint ticket_sale_ibfk_1
         foreign key (Customer_ID) references Customer (Customer_ID)
             on update cascade
@@ -1051,6 +1256,9 @@ create table Ticket_Sale
 
 create index Customer_ID
     on Ticket_Sale (Customer_ID);
+
+create index idx_ticket_visit_date
+    on Ticket_Sale (Visit_Date);
 
 create table Ticket_Type
 (
@@ -1201,7 +1409,7 @@ BEGIN
 
     IF NEW.Is_Contagious = 1 THEN
         SET v_disease = COALESCE(NEW.Diagnosis, 'a contagious condition');
-        SET v_vet = COALESCE(NEW.Vet_Employee_ID, fn_least_busy_vet());
+        SET v_vet = COALESCE(NEW.Vet_Employee_ID, fn_vet_for_animal(NEW.Animal_ID));
 
         SELECT Animal_Name, Enclosure_ID INTO v_name, v_enclosure
         FROM Animal WHERE Animal_ID = NEW.Animal_ID;
@@ -1217,6 +1425,19 @@ BEGIN
         SET Public_Encounter_Eligible = 0, Health_Status = 'Quarantined'
         WHERE Animal_ID = NEW.Animal_ID;
 
+        -- Tell handlers, then cancel the animal's upcoming public encounters
+        INSERT INTO Staff_Notification (Employee_ID, Animal_ID, Priority, Message)
+        SELECT ae.Handler_Employee_ID, NEW.Animal_ID, 'Important',
+               CONCAT(COUNT(*), ' upcoming encounter(s) with ', v_name, ' cancelled: animal quarantined.')
+        FROM Animal_Encounter ae
+        WHERE ae.Animal_ID = NEW.Animal_ID AND ae.Status = 'Scheduled'
+          AND ae.Scheduled_Start >= NOW() AND ae.Handler_Employee_ID IS NOT NULL
+        GROUP BY ae.Handler_Employee_ID;
+
+        UPDATE Animal_Encounter
+        SET Status = 'Cancelled', Cancel_Reason = CONCAT('Quarantine: ', v_disease)
+        WHERE Animal_ID = NEW.Animal_ID AND Status = 'Scheduled' AND Scheduled_Start >= NOW();
+
         INSERT INTO Care_Task (Animal_ID, Enclosure_ID, Task_Category, Title, Description, Priority,
                                Assigned_Employee_ID, Due_At, Source_Type, Source_ID)
         VALUES (NEW.Animal_ID, v_enclosure, 'Veterinary',
@@ -1231,7 +1452,8 @@ BEGIN
         SELECT a.Animal_ID, v_enclosure, 'Veterinary',
                CONCAT('Exposure screening: ', a.Animal_Name),
                CONCAT('Shares an enclosure with ', v_name, ', diagnosed with ', v_disease, '.'),
-               'High', v_vet, NEW.Exam_Date + INTERVAL 2 DAY, 'Health_Record', NEW.Health_Record_ID
+               'High', COALESCE(fn_primary_vet(a.Animal_ID), v_vet),
+               NEW.Exam_Date + INTERVAL 2 DAY, 'Health_Record', NEW.Health_Record_ID
         FROM Animal a
         WHERE a.Enclosure_ID = v_enclosure
           AND a.Animal_ID <> NEW.Animal_ID
@@ -1316,6 +1538,19 @@ create table Volunteer
 create index Department_ID
     on Volunteer (Department_ID);
 
+create definer = avnadmin@`%` view vw_enclosure_occupancy as
+select `e`.`Enclosure_ID`                                                     AS `Enclosure_ID`,
+       `e`.`Enclosure_Name`                                                   AS `Enclosure_Name`,
+       `e`.`Location`                                                         AS `Location`,
+       `e`.`Status`                                                           AS `Status`,
+       `e`.`Capacity`                                                         AS `Capacity`,
+       count(`a`.`Animal_ID`)                                                 AS `Active_Animals`,
+       (`e`.`Capacity` - count(`a`.`Animal_ID`))                              AS `Spaces_Left`,
+       round(((100 * count(`a`.`Animal_ID`)) / nullif(`e`.`Capacity`, 0)), 1) AS `Pct_Full`
+from (`Team4-Zoo-Database`.`Enclosure` `e` left join `Team4-Zoo-Database`.`Animal` `a`
+      on (((`a`.`Enclosure_ID` = `e`.`Enclosure_ID`) and (`a`.`Is_Active` = 1))))
+group by `e`.`Enclosure_ID`, `e`.`Enclosure_Name`, `e`.`Location`, `e`.`Status`, `e`.`Capacity`;
+
 create
     definer = avnadmin@`%` function fn_least_busy_vet() returns int reads sql data
 BEGIN
@@ -1332,6 +1567,72 @@ BEGIN
 END;
 
 create
+    definer = avnadmin@`%` function fn_primary_vet(p_animal int) returns int reads sql data
+BEGIN
+    RETURN (SELECT ae.Employee_ID
+            FROM Animal_Employee ae
+                     JOIN Veterinarian v ON v.Employee_ID = ae.Employee_ID
+            WHERE ae.Animal_ID = p_animal
+              AND ae.Assigned_Role = 'Primary Vet'
+            ORDER BY ae.Employee_ID
+            LIMIT 1);
+END;
+
+create
+    definer = avnadmin@`%` function fn_vet_for_animal(p_animal int) returns int reads sql data
+BEGIN
+    RETURN COALESCE(fn_primary_vet(p_animal), fn_least_busy_vet());
+END;
+
+create
+    definer = avnadmin@`%` procedure sp_check_feed_stock(IN p_feed int) modifies sql data
+BEGIN
+    DECLARE v_name VARCHAR(100);
+    DECLARE v_unit VARCHAR(20);
+    DECLARE v_stock DECIMAL(10, 2);
+    DECLARE v_reorder DECIMAL(10, 2);
+    DECLARE v_supplier INT;
+    DECLARE v_cost DECIMAL(10, 2);
+    DECLARE v_daily DECIMAL(10, 2);
+    DECLARE v_qty DECIMAL(10, 2);
+    DECLARE v_po INT;
+    DECLARE v_days VARCHAR(20);
+
+    SELECT Feed_Name, Unit, COALESCE(Quantity_In_Stock, 0), Reorder_Level, Supplier_ID, Unit_Cost
+    INTO v_name, v_unit, v_stock, v_reorder, v_supplier, v_cost
+    FROM Feed WHERE Feed_ID = p_feed;
+
+    IF v_reorder > 0 AND v_stock <= v_reorder
+        AND NOT EXISTS (SELECT 1 FROM Purchase_Order
+                        WHERE Feed_ID = p_feed AND Status IN ('Draft', 'Ordered')) THEN
+
+        SET v_daily = (SELECT COALESCE(SUM(Quantity), 0) FROM Feeding_Schedule
+                       WHERE Feed_ID = p_feed AND Is_Active = 1);
+        SET v_qty = GREATEST(v_daily * 14, v_reorder * 2 - v_stock);
+        SET v_days = IF(v_daily > 0, CONCAT('about ', FLOOR(v_stock / v_daily), ' days'), 'unknown days');
+
+        INSERT INTO Purchase_Order (Supplier_ID, Feed_ID, Quantity, Unit_Cost, Expected_Delivery, Status, Auto_Generated)
+        VALUES (v_supplier, p_feed, v_qty, v_cost, CURDATE() + INTERVAL 3 DAY, 'Draft', 1);
+        SET v_po = LAST_INSERT_ID();
+
+        INSERT INTO Care_Task (Task_Category, Title, Description, Priority, Due_At, Source_Type, Source_ID)
+        VALUES ('Supply', CONCAT('Approve feed order: ', v_name),
+                CONCAT(v_stock, ' ', v_unit, ' left (', v_days, ' of supply). Draft order #', v_po,
+                       ' for ', v_qty, ' ', v_unit,
+                       IF(v_supplier IS NULL, '. No supplier on file - choose one.', '.')),
+                IF(v_daily > 0 AND v_stock < v_daily * 3, 'Urgent', 'High'),
+                NOW() + INTERVAL 1 DAY, 'Purchase_Order', v_po);
+
+        INSERT INTO Staff_Notification (Employee_ID, Priority, Message)
+        SELECT DISTINCT fs.Keeper_Employee_ID, 'Important',
+                        CONCAT(v_name, ' is running low (', v_stock, ' ', v_unit, ', ', v_days,
+                               '). A restock order has been drafted.')
+        FROM Feeding_Schedule fs
+        WHERE fs.Feed_ID = p_feed AND fs.Is_Active = 1 AND fs.Keeper_Employee_ID IS NOT NULL;
+    END IF;
+END;
+
+create
     definer = avnadmin@`%` procedure sp_notify_enclosure_keepers(IN p_enclosure int, IN p_animal int,
                                                                  IN p_priority varchar(20), IN p_message varchar(500))
     modifies sql data
@@ -1342,5 +1643,56 @@ BEGIN
     WHERE ke.Enclosure_ID = p_enclosure
       AND (ke.Assignment_Start_Date IS NULL OR ke.Assignment_Start_Date <= CURDATE())
       AND (ke.Assignment_End_Date IS NULL OR ke.Assignment_End_Date >= CURDATE());
+END;
+
+create
+    definer = avnadmin@`%` procedure sp_reassign_for_absence(IN p_emp int, IN p_date date, IN p_dept int)
+    modifies sql data
+BEGIN
+    DECLARE v_cover INT DEFAULT NULL;
+    DECLARE v_moved INT DEFAULT 0;
+    DECLARE v_name VARCHAR(101);
+    DECLARE v_cover_name VARCHAR(101);
+    DECLARE v_manager INT;
+
+    SET v_name = (SELECT CONCAT(First_Name, ' ', Last_Name) FROM Employee WHERE Employee_ID = p_emp);
+    SET v_manager = (SELECT Manager_Employee_ID FROM Department WHERE Department_ID = p_dept);
+
+    SET v_cover = (SELECT s.Employee_ID
+                   FROM Employee_Shift s
+                            JOIN Employee e ON e.Employee_ID = s.Employee_ID
+                            LEFT JOIN Care_Task t ON t.Assigned_Employee_ID = s.Employee_ID
+                       AND t.Status IN ('Open', 'In Progress')
+                   WHERE s.Shift_Date = p_date
+                     AND s.Status <> 'Absent'
+                     AND s.Employee_ID <> p_emp
+                     AND COALESCE(s.Department_ID, e.Department_ID) <=> p_dept
+                   GROUP BY s.Employee_ID
+                   ORDER BY COUNT(t.Task_ID), s.Employee_ID
+                   LIMIT 1);
+    SET v_cover_name = (SELECT CONCAT(First_Name, ' ', Last_Name) FROM Employee WHERE Employee_ID = v_cover);
+
+    UPDATE Care_Task
+    SET Assigned_Employee_ID = v_cover
+    WHERE Assigned_Employee_ID = p_emp
+      AND Status IN ('Open', 'In Progress')
+      AND (Due_At IS NULL OR DATE(Due_At) <= p_date);
+    SET v_moved = ROW_COUNT();
+
+    IF v_moved > 0 AND v_cover IS NOT NULL THEN
+        INSERT INTO Staff_Notification (Employee_ID, Priority, Message)
+        VALUES (v_cover, 'Important',
+                CONCAT('You are covering ', v_moved, ' task(s) for ', v_name, ', who is absent on ', p_date, '.'));
+    END IF;
+
+    IF v_manager IS NOT NULL AND v_manager <> p_emp THEN
+        INSERT INTO Staff_Notification (Employee_ID, Priority, Message)
+        VALUES (v_manager, IF(v_cover IS NULL AND v_moved > 0, 'Urgent', 'Info'),
+                CONCAT(v_name, ' is absent on ', p_date, '. ',
+                       IF(v_moved = 0, 'No open tasks were affected.',
+                          IF(v_cover IS NULL,
+                             CONCAT(v_moved, ' task(s) are UNASSIGNED - nobody else in the department is on shift.'),
+                             CONCAT(v_moved, ' task(s) reassigned to ', v_cover_name, '.')))));
+    END IF;
 END;
 
