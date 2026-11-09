@@ -1,4 +1,5 @@
 @page
+@inject IWebHostEnvironment Env
 @model ZooDatabase.Pages.Animals.AnimalsModel
 @using ZooDatabase.Data
 @{
@@ -75,7 +76,20 @@
                 @foreach (var a in Model.Rows)
                 {
                     <tr class="clickable-row" onclick="location.href='/Animals/Details/@a.AnimalId'">
-                        <td><a href="/Animals/Details/@a.AnimalId" class="fw-semibold text-decoration-none text-dark">@a.Name</a></td>
+                        <td>
+                            @{ var thumb = PublicSite.AnimalPhoto(Env, a.AnimalId, a.Species); }
+                            <span class="d-inline-flex align-items-center gap-2">
+                                @if (thumb != null)
+                                {
+                                    <img src="@thumb" alt="" class="animal-thumb" loading="lazy" />
+                                }
+                                else
+                                {
+                                    <span class="animal-thumb animal-thumb--empty" aria-hidden="true"></span>
+                                }
+                                <a href="/Animals/Details/@a.AnimalId" class="fw-semibold text-decoration-none text-dark">@a.Name</a>
+                            </span>
+                        </td>
                         <td>
                             @a.Species
                             @if (a.ScientificName != null)

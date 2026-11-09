@@ -1,0 +1,52 @@
+@page "/visit/shop"
+@model ZooDatabase.Pages.Visit.ShopModel
+@using ZooDatabase.Data
+@{
+    ViewData["Title"] = "Shop Online";
+}
+
+<section class="page-banner">
+    <div class="pub-wrap">
+        <h1>Shop Online</h1>
+    </div>
+</section>
+
+<section class="pub-section">
+    <div class="pub-wrap buy-layout">
+        <partial name="_ShopNav" model="@("shop")" />
+
+        <div class="buy-main">
+            <h2 class="buy-title">Gift Shop Favorites</h2>
+            <p class="pub-lead">Order now and pick them up at the gift shop on your visit.</p>
+            @if (Model.ErrorMessage != null)
+            {
+                <div class="pub-alert" role="alert">@Model.ErrorMessage</div>
+            }
+            <form method="post" asp-page-handler="Add" class="buy-box">
+                @foreach (var p in Model.Products)
+                {
+                    <div class="ticket-row">
+                        <div class="ticket-name">
+                            <span>@p.Name</span>
+                            <small>@(p.Category ?? "Gift") · pick up at @p.GiftShop</small>
+                        </div>
+                        <div class="ticket-price">@p.Price.ToString("C")</div>
+                        <div class="stepper">
+                            <button type="button" data-step="-1" data-target="qty-@p.Id" aria-label="One less @p.Name">−</button>
+                            <input id="qty-@p.Id" name="Quantities[@p.Id]" type="number" min="0" max="@(Math.Min(p.Stock, Cart.MaxPerLine))" value="0" aria-label="How many @p.Name" />
+                            <button type="button" data-step="1" data-target="qty-@p.Id" aria-label="One more @p.Name">+</button>
+                        </div>
+                    </div>
+                }
+                <div class="buy-continue">
+                    <button type="submit" class="pub-btn pub-btn--green">Add to cart</button>
+                </div>
+            </form>
+
+            <div class="shop-more">
+                <h2>There's so much more in the park</h2>
+                <p>Our gift shops carry a much bigger selection of plush animals, apparel, books and souvenirs. Stop by during your visit!</p>
+            </div>
+        </div>
+    </div>
+</section>

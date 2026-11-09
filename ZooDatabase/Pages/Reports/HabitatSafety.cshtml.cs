@@ -5,13 +5,27 @@ using ZooDatabase.Data;
 
 namespace ZooDatabase.Pages.Reports;
 
-// HABITAT SAFETY & MAINTENANCE REPORT
-// Question: "Are enclosures safe, which ones keep failing inspection, and how fast do we fix problems?"
-// Uses Habitat_Inspection, Maintenance (linked by Inspection_ID), Enclosure, Employee.
+// HABITAT SAFETY REPORT
+// Question: "Are enclosures safe, what keeps going wrong, and are problems getting fixed?"
+// Uses Habitat_Inspection, Maintenance, Enclosure, Employee.
+// Every count links to the inspections or work orders behind it.
 [Authorize(Roles = ReportAccess.HabitatSafety)]
-public class HabitatSafetyModel : ReportPageModel
+public class HabitatSafetyModel : RunnableReport
 {
     public HabitatSafetyModel(IConfiguration config) : base(config) { }
+
+    public override string ReportTitle => "Habitat Safety";
+
+    public override IReadOnlyList<ReportView> Views { get; } = new[]
+    {
+        new ReportView("monthly", "Inspections & repairs by month", "inspection results and repair work each month."),
+        new ReportView("enclosure", "Enclosure scorecard", "pass rate, open repairs and repair cost for each enclosure."),
+        new ReportView("issues", "Recurring issues", "which kinds of problems inspectors keep finding."),
+        new ReportView("followup", "Failed inspection follow-up", "every failed inspection and whether its repair got done."),
+        new ReportView("open", "Open work orders", "repairs not finished yet, most urgent first (as of today).", UsesDates: false),
+        new ReportView("insp", "Inspections", "", Hidden: true),
+        new ReportView("repairs", "Work orders", "", Hidden: true)
+    };
 
     public static readonly string[] IssueCategories =
     {
@@ -19,145 +33,134 @@ public class HabitatSafetyModel : ReportPageModel
         "Electrical", "Sanitation", "Vegetation/Hazard", "Other"
     };
 
-    // ---- Filters ----
     [BindProperty(SupportsGet = true)] public int? EnclosureId { get; set; }
-    [BindProperty(SupportsGet = true)] public string? Category { get; set; }
+    [BindProperty(SupportsGet = true)] public int? CategoryId { get; set; }
+    private string? Category => CategoryId is >= 1 and <= 8 ? IssueCategories[CategoryId.Value - 1] : null;
 
-    public List<Option> EnclosureOptions { get; set; } = new();
+    private List<Option> _enclosures = new();
 
-    // ---- Results ----
-    public int Inspections { get; set; }
-    public int Passed { get; set; }
-    public int Minor { get; set; }
-    public int Critical { get; set; }
-    public decimal PassRate => Pct(Passed, Inspections);
+    protected override async Task LoadFiltersAsync(MySqlConnection conn)
+    {
+        _enclosures = await LoadOptionsAsync(conn, "SELECT Enclosure_ID, Enclosure_Name FROM Enclosure ORDER BY Enclosure_Name");
+        Filters.Add(new FilterField(nameof(EnclosureId), "Enclosure", _enclosures, EnclosureId?.ToString()));
+        Filters.Add(new FilterField(nameof(CategoryId), "Issue type",
+            IssueCategories.Select((c, i) => new Option(i + 1, c)).ToList(), CategoryId?.ToString()));
+    }
 
-    public int RepairsRequested { get; set; }
-    public int RepairsCompleted { get; set; }
-    public decimal? AvgDaysToFix { get; set; }
-    public decimal RepairCost { get; set; }
-    public int OpenUrgent => OpenWork.Count(w => w.Priority is "Emergency" or "High");
-
-    public List<EnclosureRow> ByEnclosure { get; set; } = new();
-    public List<CategoryRow> ByCategory { get; set; } = new();
-    public List<FollowUpRow> FollowUps { get; set; } = new();
-    public List<MonthRow> Months { get; set; } = new();
-    public List<WorkRow> OpenWork { get; set; } = new();
-
-    public string FilterText
+    private string InspWhere
     {
         get
         {
-            var parts = new List<string>();
-            if (EnclosureId != null) parts.Add("Enclosure: " + EnclosureOptions.FirstOrDefault(o => o.Id == EnclosureId)?.Name);
-            if (!string.IsNullOrEmpty(Category)) parts.Add("Issue: " + Category);
-            return string.Join(" · ", parts);
+            var w = "i.Inspection_Date >= @from AND i.Inspection_Date < @to";
+            if (EnclosureId != null) w += " AND i.Enclosure_ID = @enclosure";
+            if (Category != null) w += " AND i.Issue_Category = @category";
+            return w;
         }
     }
 
-    public async Task OnGetAsync() => await LoadAsync();
-
-    public async Task<IActionResult> OnGetExcelAsync()
+    private string RepairWhere
     {
-        await LoadAsync();
-        var subtitle = $"{DateRangeText}{(FilterText == "" ? "" : " · " + FilterText)} · Generated {DateTime.Now:MMM d, yyyy h:mm tt}";
-
-        var xl = new ExcelReport("Habitat Safety & Maintenance Report", subtitle)
-            .AddSheet("Summary", new[] { "Measure", "Value" }, new[]
-            {
-                new object?[] { "Inspections", Inspections },
-                new object?[] { "Pass rate (%)", PassRate },
-                new object?[] { "Minor issues", Minor },
-                new object?[] { "Critical failures", Critical },
-                new object?[] { "Repairs requested", RepairsRequested },
-                new object?[] { "Repairs completed", RepairsCompleted },
-                new object?[] { "Average days to fix", AvgDaysToFix },
-                new object?[] { "Repair cost ($)", RepairCost },
-                new object?[] { "Open high/emergency work orders (today)", OpenUrgent }
-            })
-            .AddSheet("By Enclosure", new[] { "Enclosure", "Status", "Inspections", "Pass Rate (%)", "Minor", "Critical",
-                                              "Last Inspected", "Days Since", "Open Repairs", "Repair Cost ($)" },
-                ByEnclosure.Select(e => new object?[] { e.Name, e.Status, e.Inspections, e.PassRate, e.Minor, e.Critical,
-                                                        e.LastInspected, e.DaysSince, e.OpenRepairs, e.RepairCost }),
-                row => (int)(row[5] ?? 0) > 0 || (string?)row[1] != "Open" ? ExcelReport.Red
-                     : row[7] == null || (int)row[7]! > 30 ? ExcelReport.Yellow : null)
-            .AddSheet("Issues by Category", new[] { "Category", "Findings", "Critical", "Enclosures Affected", "Last Seen" },
-                ByCategory.Select(c => new object?[] { c.Category, c.Findings, c.Critical, c.Enclosures, c.LastSeen }))
-            .AddSheet("Follow-up", new[] { "Inspected", "Enclosure", "Result", "Category", "Findings", "Inspector",
-                                           "Work Order", "Priority", "Repair Status", "Days to Fix / Open" },
-                FollowUps.Select(f => new object?[] { f.Date, f.Enclosure, f.Result, f.Category, f.Findings, f.Inspector,
-                                                      f.MaintenanceId, f.Priority, f.RepairStatus, f.Days }),
-                row => (string?)row[2] == "Critical" ? ExcelReport.Red : ExcelReport.Yellow)
-            .AddSheet("Monthly", new[] { "Month", "Inspections", "Minor", "Critical", "Repairs Requested", "Repairs Completed", "Repair Cost ($)" },
-                Months.Select(m => new object?[] { MonthName(m.YearMonth), m.Inspections, m.Minor, m.Critical, m.Requested, m.Completed, m.Cost }))
-            .AddSheet("Open Work Orders", new[] { "Work Order", "Enclosure", "Description", "Priority", "Status", "Requested", "Days Open", "Assigned To" },
-                OpenWork.Select(w => new object?[] { w.Id, w.Enclosure, w.Description, w.Priority, w.Status, w.Requested, w.DaysOpen, w.AssignedTo }),
-                row => (string?)row[3] is "Emergency" or "High" ? ExcelReport.Red : null);
-
-        return File(xl.ToBytes(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    $"habitat-safety-report-{DateTime.Today:yyyy-MM-dd}.xlsx");
+        get
+        {
+            var w = "m.Enclosure_ID IS NOT NULL AND m.Request_Date >= @from AND m.Request_Date < @to";
+            if (EnclosureId != null) w += " AND m.Enclosure_ID = @enclosure";
+            if (Category != null) w += " AND EXISTS (SELECT 1 FROM Habitat_Inspection i2 WHERE i2.Inspection_ID = m.Inspection_ID AND i2.Issue_Category = @category)";
+            return w;
+        }
     }
 
-    private async Task LoadAsync()
+    private MySqlCommand Cmd(MySqlConnection conn, string sql)
     {
-        ResolveDates();
-        if (!string.IsNullOrEmpty(Category) && !IssueCategories.Contains(Category)) Category = null;
+        var cmd = new MySqlCommand(sql, conn);
+        AddDateParams(cmd);
+        if (EnclosureId != null) cmd.Parameters.AddWithValue("@enclosure", EnclosureId);
+        if (Category != null) cmd.Parameters.AddWithValue("@category", Category);
+        return cmd;
+    }
 
-        await using var conn = await OpenAsync();
-        EnclosureOptions = await LoadOptionsAsync(conn, "SELECT Enclosure_ID, Enclosure_Name FROM Enclosure ORDER BY Enclosure_Name");
+    private static readonly Dictionary<string, (string Label, string Sql)> InspKinds = new()
+    {
+        ["all"] = ("All inspections", "1=1"),
+        ["pass"] = ("Passed", "i.Result = 'Pass'"),
+        ["minor"] = ("Minor issues", "i.Result = 'Minor Issues'"),
+        ["critical"] = ("Critical", "i.Result = 'Critical'"),
+        ["problem"] = ("Problems found", "i.Result <> 'Pass' AND i.Issue_Category <> 'None'")
+    };
 
-        // Inspection filters (alias i) and repair filters (alias m)
-        var inspWhere = "i.Inspection_Date >= @from AND i.Inspection_Date < @to";
-        if (EnclosureId != null) inspWhere += " AND i.Enclosure_ID = @enclosure";
-        if (Category != null) inspWhere += " AND i.Issue_Category = @category";
+    private static readonly Dictionary<string, (string Label, string Sql)> RepairKinds = new()
+    {
+        ["all"] = ("All work orders", "1=1"),
+        ["done"] = ("Completed", "m.Status = 'Completed'"),
+        ["cost"] = ("With a cost", "COALESCE(m.Cost, 0) > 0"),
+        ["open"] = ("Not finished", "COALESCE(m.Status, 'Open') NOT IN ('Completed', 'Cancelled')")
+    };
 
-        var repairWhere = "m.Enclosure_ID IS NOT NULL AND m.Request_Date >= @from AND m.Request_Date < @to";
-        if (EnclosureId != null) repairWhere += " AND m.Enclosure_ID = @enclosure";
-        if (Category != null) repairWhere += " AND EXISTS (SELECT 1 FROM Habitat_Inspection i2 WHERE i2.Inspection_ID = m.Inspection_ID AND i2.Issue_Category = @category)";
+    protected override Task<ReportTable> BuildAsync(MySqlConnection conn) => CurrentView.Key switch
+    {
+        "enclosure" => EnclosuresAsync(conn),
+        "issues" => IssuesAsync(conn),
+        "followup" => FollowUpAsync(conn),
+        "open" => OpenWorkAsync(conn),
+        "insp" => InspectionsAsync(conn),
+        "repairs" => RepairsAsync(conn),
+        _ => MonthlyAsync(conn)
+    };
 
-        MySqlCommand Cmd(string sql)
-        {
-            var cmd = new MySqlCommand(sql, conn);
-            AddDateParams(cmd);
-            if (EnclosureId != null) cmd.Parameters.AddWithValue("@enclosure", EnclosureId);
-            if (Category != null) cmd.Parameters.AddWithValue("@category", Category);
-            return cmd;
-        }
-
-        // 1. Inspection totals
-        await using (var cmd = Cmd($@"
-            SELECT COUNT(*), SUM(i.Result = 'Pass'), SUM(i.Result = 'Minor Issues'), SUM(i.Result = 'Critical')
-            FROM Habitat_Inspection i WHERE {inspWhere}"))
+    // ===== Inspections & repairs by month =====
+    private async Task<ReportTable> MonthlyAsync(MySqlConnection conn)
+    {
+        var t = Table(new Col("Month"), new Col("Inspections", true), new Col("Minor issues", true), new Col("Critical", true),
+                      new Col("Repairs requested", true), new Col("Repairs completed", true), new Col("Repair cost", true));
+        var months = new SortedDictionary<string, MonthAgg>();
+        MonthAgg M(string ym) => months.TryGetValue(ym, out var x) ? x : months[ym] = new MonthAgg();
+        await using (var cmd = Cmd(conn, $@"
+            SELECT DATE_FORMAT(i.Inspection_Date, '%Y-%m'), COUNT(*), SUM(i.Result = 'Minor Issues'), SUM(i.Result = 'Critical')
+            FROM Habitat_Inspection i WHERE {InspWhere} GROUP BY 1"))
         await using (var r = await cmd.ExecuteReaderAsync())
-        {
-            if (await r.ReadAsync())
+            while (await r.ReadAsync())
             {
-                Inspections = Int(r, 0); Passed = Int(r, 1); Minor = Int(r, 2); Critical = Int(r, 3);
+                var m = M(r.GetString(0));
+                m.Insp = Int(r, 1); m.Minor = Int(r, 2); m.Crit = Int(r, 3);
             }
-        }
-
-        // 2. Repair totals: requested in period, how many got finished, how long it took, what it cost
-        await using (var cmd = Cmd($@"
-            SELECT COUNT(*),
-                   SUM(m.Status = 'Completed'),
-                   AVG(CASE WHEN m.Status = 'Completed' THEN DATEDIFF(m.Completion_Date, m.Request_Date) END),
-                   SUM(COALESCE(m.Cost, 0))
-            FROM Maintenance m WHERE {repairWhere}"))
+        await using (var cmd = Cmd(conn, $@"
+            SELECT DATE_FORMAT(m.Request_Date, '%Y-%m'), COUNT(*), SUM(m.Status = 'Completed'), SUM(COALESCE(m.Cost, 0))
+            FROM Maintenance m WHERE {RepairWhere} GROUP BY 1"))
         await using (var r = await cmd.ExecuteReaderAsync())
-        {
-            if (await r.ReadAsync())
+            while (await r.ReadAsync())
             {
-                RepairsRequested = Int(r, 0);
-                RepairsCompleted = Int(r, 1);
-                AvgDaysToFix = DecOrNull(r, 2) is decimal d ? Math.Round(d, 1) : null;
-                RepairCost = Dec(r, 3);
+                var m = M(r.GetString(0));
+                m.Req = Int(r, 1); m.Done = Int(r, 2); m.Cost = Dec(r, 3);
             }
-        }
 
-        // 3. Enclosure scorecard. LEFT JOINs to subquery totals keep enclosures with no inspections in the list.
-        var enclosureFilter = EnclosureId != null ? "WHERE e.Enclosure_ID = @enclosure" : "";
-        await using (var cmd = Cmd($@"
-            SELECT e.Enclosure_Name, e.Status,
+        foreach (var (ym, m) in months)
+        {
+            var key = "m:" + ym;
+            t.Rows.Add(R(new[]
+            {
+                T(MonthName(ym)), N(m.Insp, Drill("insp", key, "all")), N(m.Minor, Drill("insp", key, "minor")),
+                N(m.Crit, Drill("insp", key, "critical")), N(m.Req, Drill("repairs", key, "all")),
+                N(m.Done, Drill("repairs", key, "done")), Money(m.Cost, Drill("repairs", key, "cost"))
+            }, m.Crit > 0 ? "bad" : null));
+        }
+        var all = months.Values;
+        t.Total = R(new[]
+        {
+            T("Total"), N(all.Sum(m => m.Insp), Drill("insp", "all", "all")), N(all.Sum(m => m.Minor), Drill("insp", "all", "minor")),
+            N(all.Sum(m => m.Crit), Drill("insp", "all", "critical")), N(all.Sum(m => m.Req), Drill("repairs", "all", "all")),
+            N(all.Sum(m => m.Done), Drill("repairs", "all", "done")), Money(all.Sum(m => m.Cost), Drill("repairs", "all", "cost"))
+        });
+        t.Note = "Red: a month with a critical finding. Repairs are counted in the month they were requested.";
+        return t;
+    }
+
+    // ===== Enclosure scorecard =====
+    private async Task<ReportTable> EnclosuresAsync(MySqlConnection conn)
+    {
+        var t = Table(new Col("Enclosure"), new Col("Status"), new Col("Inspections", true), new Col("Pass rate", true),
+                      new Col("Minor", true), new Col("Critical", true), new Col("Last inspected"),
+                      new Col("Open repairs", true), new Col("Repair cost", true));
+        await using var cmd = Cmd(conn, $@"
+            SELECT e.Enclosure_ID, e.Enclosure_Name, e.Status,
                    COALESCE(ins.Total, 0), COALESCE(ins.Passed, 0), COALESCE(ins.Minor, 0), COALESCE(ins.Critical, 0),
                    (SELECT MAX(x.Inspection_Date) FROM Habitat_Inspection x WHERE x.Enclosure_ID = e.Enclosure_ID),
                    (SELECT COUNT(*) FROM Maintenance o WHERE o.Enclosure_ID = e.Enclosure_ID
@@ -166,67 +169,67 @@ public class HabitatSafetyModel : ReportPageModel
             FROM Enclosure e
             LEFT JOIN (SELECT i.Enclosure_ID, COUNT(*) AS Total, SUM(i.Result = 'Pass') AS Passed,
                               SUM(i.Result = 'Minor Issues') AS Minor, SUM(i.Result = 'Critical') AS Critical
-                       FROM Habitat_Inspection i WHERE {inspWhere}
-                       GROUP BY i.Enclosure_ID) ins ON ins.Enclosure_ID = e.Enclosure_ID
+                       FROM Habitat_Inspection i WHERE {InspWhere} GROUP BY i.Enclosure_ID) ins ON ins.Enclosure_ID = e.Enclosure_ID
             LEFT JOIN (SELECT m.Enclosure_ID, SUM(COALESCE(m.Cost, 0)) AS Cost
-                       FROM Maintenance m WHERE {repairWhere}
-                       GROUP BY m.Enclosure_ID) rep ON rep.Enclosure_ID = e.Enclosure_ID
-            {enclosureFilter}"))
-        await using (var r = await cmd.ExecuteReaderAsync())
+                       FROM Maintenance m WHERE {RepairWhere} GROUP BY m.Enclosure_ID) rep ON rep.Enclosure_ID = e.Enclosure_ID
+            {(EnclosureId != null ? "WHERE e.Enclosure_ID = @enclosure" : "")}
+            ORDER BY COALESCE(ins.Critical, 0) DESC, COALESCE(ins.Passed, 0) / NULLIF(ins.Total, 0), e.Enclosure_Name");
+        await using var r = await cmd.ExecuteReaderAsync();
+        while (await r.ReadAsync())
         {
-            while (await r.ReadAsync())
+            var id = r.GetInt32(0);
+            var key = "e:" + id;
+            int total = Int(r, 3), passed = Int(r, 4), critical = Int(r, 6), open = Int(r, 8);
+            var last = DateOrNull(r, 7);
+            bool stale = last == null || last < DateTime.Today.AddDays(-30);
+            t.Rows.Add(R(new[]
             {
-                var row = new EnclosureRow
-                {
-                    Name = r.GetString(0),
-                    Status = r.GetString(1),
-                    Inspections = Int(r, 2),
-                    Passed = Int(r, 3),
-                    Minor = Int(r, 4),
-                    Critical = Int(r, 5),
-                    LastInspected = DateOrNull(r, 6),
-                    OpenRepairs = Int(r, 7),
-                    RepairCost = Dec(r, 8)
-                };
-                row.DaysSince = row.LastInspected == null ? null : (DateTime.Today - row.LastInspected.Value.Date).Days;
-                ByEnclosure.Add(row);
-            }
+                T(r.GetString(1)), T(Str(r, 2)), N(total, Drill("insp", key, "all")),
+                total == 0 ? T("—") : PctCell(Pct(passed, total)),
+                N(Int(r, 5), Drill("insp", key, "minor")), N(critical, Drill("insp", key, "critical")),
+                D(last), N(open, Drill("repairs", key, "open-ever")), Money(Dec(r, 9), Drill("repairs", key, "cost"))
+            }, critical > 0 ? "bad" : open > 0 || stale ? "warn" : null, $"/Animals/EnclosureDetails/{id}"));
         }
-        // Worst first: closed, then most critical, then lowest pass rate
-        ByEnclosure = ByEnclosure
-            .OrderByDescending(e => e.Status != "Open")
-            .ThenByDescending(e => e.Critical)
-            .ThenBy(e => e.Inspections == 0 ? 101 : e.PassRate)
-            .ThenBy(e => e.Name)
-            .ToList();
+        t.Note = "Red: had a critical finding. Yellow: has open repairs, or not inspected in 30+ days. Open repairs are as of today.";
+        return t;
+    }
 
-        // 4. What kinds of problems keep coming up
-        await using (var cmd = Cmd($@"
+    // ===== Recurring issues =====
+    private async Task<ReportTable> IssuesAsync(MySqlConnection conn)
+    {
+        var t = Table(new Col("Issue type"), new Col("Times found", true), new Col("Critical", true),
+                      new Col("Enclosures affected", true), new Col("Last seen"));
+        await using var cmd = Cmd(conn, $@"
             SELECT i.Issue_Category, COUNT(*), SUM(i.Result = 'Critical'), COUNT(DISTINCT i.Enclosure_ID), MAX(i.Inspection_Date)
             FROM Habitat_Inspection i
-            WHERE {inspWhere} AND i.Result <> 'Pass' AND i.Issue_Category <> 'None'
-            GROUP BY i.Issue_Category
-            ORDER BY COUNT(*) DESC"))
-        await using (var r = await cmd.ExecuteReaderAsync())
+            WHERE {InspWhere} AND i.Result <> 'Pass' AND i.Issue_Category <> 'None'
+            GROUP BY i.Issue_Category ORDER BY COUNT(*) DESC");
+        await using var r = await cmd.ExecuteReaderAsync();
+        while (await r.ReadAsync())
         {
-            while (await r.ReadAsync())
+            var cat = r.GetString(0);
+            var idx = Array.IndexOf(IssueCategories, cat) + 1;
+            var key = idx > 0 ? "c:" + idx : "cn:" + cat;
+            int crit = Int(r, 2);
+            t.Rows.Add(R(new[]
             {
-                ByCategory.Add(new CategoryRow
-                {
-                    Category = r.GetString(0),
-                    Findings = Int(r, 1),
-                    Critical = Int(r, 2),
-                    Enclosures = Int(r, 3),
-                    LastSeen = r.GetDateTime(4)
-                });
-            }
+                T(cat), N(Int(r, 1), Drill("insp", key, "problem")), N(crit, Drill("insp", key, "critical")),
+                N(Int(r, 3), Drill("insp", key, "problem")), D(r.GetDateTime(4))
+            }, crit > 0 ? "bad" : null));
         }
+        t.EmptyText = "No problems were found in this date range.";
+        t.Note = "Red: at least one critical finding of this type.";
+        return t;
+    }
 
-        // 5. Follow-up: every failed inspection and the work order (if any) raised from it
-        await using (var cmd = Cmd($@"
-            SELECT i.Inspection_Date, e.Enclosure_Name, i.Result, i.Issue_Category, i.Findings,
-                   CONCAT(emp.First_Name, ' ', emp.Last_Name),
-                   m.Maintenance_ID, m.Priority, m.Status,
+    // ===== Failed inspection follow-up =====
+    private async Task<ReportTable> FollowUpAsync(MySqlConnection conn)
+    {
+        var t = Table(new Col("Date"), new Col("Enclosure"), new Col("Result"), new Col("Issue type"), new Col("Findings"),
+                      new Col("Inspector"), new Col("Work order"), new Col("Repair status"), new Col("Days", true));
+        await using var cmd = Cmd(conn, $@"
+            SELECT i.Inspection_Date, e.Enclosure_ID, e.Enclosure_Name, i.Result, i.Issue_Category, i.Findings,
+                   CONCAT(emp.First_Name, ' ', emp.Last_Name), m.Maintenance_ID, m.Priority, m.Status,
                    CASE WHEN m.Maintenance_ID IS NULL THEN NULL
                         WHEN m.Status = 'Completed' THEN DATEDIFF(m.Completion_Date, m.Request_Date)
                         ELSE DATEDIFF(CURDATE(), m.Request_Date) END
@@ -234,148 +237,164 @@ public class HabitatSafetyModel : ReportPageModel
             JOIN Enclosure e ON e.Enclosure_ID = i.Enclosure_ID
             LEFT JOIN Employee emp ON emp.Employee_ID = i.Inspector_Employee_ID
             LEFT JOIN Maintenance m ON m.Inspection_ID = i.Inspection_ID
-            WHERE {inspWhere} AND i.Result <> 'Pass'
-            ORDER BY FIELD(i.Result, 'Critical', 'Minor Issues'), i.Inspection_Date DESC"))
-        await using (var r = await cmd.ExecuteReaderAsync())
+            WHERE {InspWhere} AND i.Result <> 'Pass'
+            ORDER BY FIELD(i.Result, 'Critical', 'Minor Issues'), i.Inspection_Date DESC");
+        await using var r = await cmd.ExecuteReaderAsync();
+        while (await r.ReadAsync())
         {
-            while (await r.ReadAsync())
+            bool hasOrder = !r.IsDBNull(7);
+            var status = hasOrder ? (Str(r, 9) ?? "Open") : "No work order";
+            var result = r.GetString(3);
+            t.Rows.Add(R(new[]
             {
-                var status = Str(r, 8);
-                FollowUps.Add(new FollowUpRow
-                {
-                    Date = r.GetDateTime(0),
-                    Enclosure = r.GetString(1),
-                    Result = r.GetString(2),
-                    Category = r.GetString(3),
-                    Findings = Str(r, 4),
-                    Inspector = Str(r, 5),
-                    MaintenanceId = r.IsDBNull(6) ? null : r.GetInt32(6),
-                    Priority = Str(r, 7),
-                    RepairStatus = r.IsDBNull(6) ? "No work order" : (status ?? "Open"),
-                    Days = r.IsDBNull(9) ? null : Int(r, 9)
-                });
-            }
+                D(r.GetDateTime(0)), T(r.GetString(2), $"/Animals/EnclosureDetails/{r.GetInt32(1)}"), T(result),
+                T(Str(r, 4)), T(Str(r, 5)), T(Str(r, 6)),
+                hasOrder ? T($"#{r.GetInt32(7)} ({Str(r, 8)})", $"/Staff/MaintenanceEdit/{r.GetInt32(7)}") : T("—"),
+                T(status), r.IsDBNull(10) ? T("—") : N(Int(r, 10))
+            }, status == "Completed" ? null : result == "Critical" ? "bad" : "warn"));
         }
+        t.EmptyText = "Every inspection in this range passed.";
+        t.Note = "Red: critical and not fixed yet. Yellow: minor and not fixed yet. Days = days to fix, or days open so far.";
+        return t;
+    }
 
-        // 6. Month by month: inspections and repairs come from different tables, so run both and merge by month
-        var months = new SortedDictionary<string, MonthRow>();
-        MonthRow Month(string key) => months.TryGetValue(key, out var m) ? m : months[key] = new MonthRow { YearMonth = key };
-
-        await using (var cmd = Cmd($@"
-            SELECT DATE_FORMAT(i.Inspection_Date, '%Y-%m'), COUNT(*), SUM(i.Result = 'Minor Issues'), SUM(i.Result = 'Critical')
-            FROM Habitat_Inspection i WHERE {inspWhere}
-            GROUP BY DATE_FORMAT(i.Inspection_Date, '%Y-%m')"))
-        await using (var r = await cmd.ExecuteReaderAsync())
-        {
-            while (await r.ReadAsync())
-            {
-                var m = Month(r.GetString(0));
-                m.Inspections = Int(r, 1); m.Minor = Int(r, 2); m.Critical = Int(r, 3);
-            }
-        }
-        await using (var cmd = Cmd($@"
-            SELECT DATE_FORMAT(m.Request_Date, '%Y-%m'), COUNT(*), SUM(m.Status = 'Completed'), SUM(COALESCE(m.Cost, 0))
-            FROM Maintenance m WHERE {repairWhere}
-            GROUP BY DATE_FORMAT(m.Request_Date, '%Y-%m')"))
-        await using (var r = await cmd.ExecuteReaderAsync())
-        {
-            while (await r.ReadAsync())
-            {
-                var m = Month(r.GetString(0));
-                m.Requested = Int(r, 1); m.Completed = Int(r, 2); m.Cost = Dec(r, 3);
-            }
-        }
-        Months = months.Values.ToList();
-
-        // 7. Open work orders right now (not limited to the date range: open work is open work)
-        var openFilter = EnclosureId != null ? "AND m.Enclosure_ID = @enclosure" : "";
-        await using (var cmd = Cmd($@"
-            SELECT m.Maintenance_ID, e.Enclosure_Name, m.Description, m.Priority, COALESCE(m.Status, 'Open'), m.Request_Date,
-                   DATEDIFF(CURDATE(), m.Request_Date), CONCAT(emp.First_Name, ' ', emp.Last_Name)
+    // ===== Open work orders (as of today) =====
+    private async Task<ReportTable> OpenWorkAsync(MySqlConnection conn)
+    {
+        var t = Table(new Col("Work order"), new Col("Enclosure"), new Col("Description"), new Col("Priority"),
+                      new Col("Status"), new Col("Requested"), new Col("Days open", true), new Col("Assigned to"));
+        await using var cmd = Cmd(conn, $@"
+            SELECT m.Maintenance_ID, e.Enclosure_ID, e.Enclosure_Name, m.Description, m.Priority, COALESCE(m.Status, 'Open'),
+                   m.Request_Date, DATEDIFF(CURDATE(), m.Request_Date), CONCAT(emp.First_Name, ' ', emp.Last_Name)
             FROM Maintenance m
             JOIN Enclosure e ON e.Enclosure_ID = m.Enclosure_ID
             LEFT JOIN Employee emp ON emp.Employee_ID = m.Employee_ID
-            WHERE COALESCE(m.Status, 'Open') NOT IN ('Completed', 'Cancelled') {openFilter}
-            ORDER BY FIELD(m.Priority, 'Emergency', 'High', 'Normal', 'Low'), m.Request_Date"))
-        await using (var r = await cmd.ExecuteReaderAsync())
+            WHERE COALESCE(m.Status, 'Open') NOT IN ('Completed', 'Cancelled')
+                  {(EnclosureId != null ? "AND m.Enclosure_ID = @enclosure" : "")}
+            ORDER BY FIELD(m.Priority, 'Emergency', 'High', 'Normal', 'Low'), m.Request_Date");
+        await using var r = await cmd.ExecuteReaderAsync();
+        while (await r.ReadAsync())
         {
-            while (await r.ReadAsync())
+            var priority = Str(r, 4);
+            int days = Int(r, 7);
+            t.Rows.Add(R(new[]
             {
-                OpenWork.Add(new WorkRow
-                {
-                    Id = r.GetInt32(0),
-                    Enclosure = r.GetString(1),
-                    Description = Str(r, 2),
-                    Priority = r.GetString(3),
-                    Status = r.GetString(4),
-                    Requested = DateOrNull(r, 5),
-                    DaysOpen = r.IsDBNull(6) ? null : Int(r, 6),
-                    AssignedTo = Str(r, 7)
-                });
-            }
+                T("#" + r.GetInt32(0), $"/Staff/MaintenanceEdit/{r.GetInt32(0)}"),
+                T(r.GetString(2), $"/Animals/EnclosureDetails/{r.GetInt32(1)}"), T(Str(r, 3)), T(priority), T(Str(r, 5)),
+                D(DateOrNull(r, 6)), N(days), T(Str(r, 8) ?? "Unassigned")
+            }, priority == "Emergency" ? "bad" : priority == "High" || days > 14 ? "warn" : null));
         }
+        t.EmptyText = "No open work orders.";
+        t.Note = "Red: emergency. Yellow: high priority, or open more than 14 days. Click a work order to update it.";
+        return t;
     }
 
-    public class EnclosureRow
+    // ===== Source records: inspections =====
+    private async Task<ReportTable> InspectionsAsync(MySqlConnection conn)
     {
-        public string Name { get; set; } = "";
-        public string Status { get; set; } = "";
-        public int Inspections { get; set; }
-        public int Passed { get; set; }
-        public int Minor { get; set; }
-        public int Critical { get; set; }
-        public decimal PassRate => Pct(Passed, Inspections);
-        public DateTime? LastInspected { get; set; }
-        public int? DaysSince { get; set; }
-        public int OpenRepairs { get; set; }
-        public decimal RepairCost { get; set; }
+        var kind = InspKinds.ContainsKey(Key2 ?? "") ? Key2! : "all";
+        var where = InspWhere + " AND " + InspKinds[kind].Sql;
+        var title = new List<string> { InspKinds[kind].Label };
+        var (type, text) = SplitKey(Key);
+        object? k = null;
+        switch (type)
+        {
+            case "m": where += " AND DATE_FORMAT(i.Inspection_Date, '%Y-%m') = @k"; k = text; title.Add(MonthName(text)); break;
+            case "e": where += " AND i.Enclosure_ID = @k"; k = text; title.Add(OptionName(_enclosures, IntOrNull(text)) ?? "enclosure"); break;
+            case "c":
+                var idx = IntOrNull(text) ?? 0;
+                k = idx is >= 1 and <= 8 ? IssueCategories[idx - 1] : "";
+                where += " AND i.Issue_Category = @k";
+                title.Add((string)k);
+                break;
+            case "cn": where += " AND i.Issue_Category = @k"; k = text; title.Add(text); break;
+        }
+
+        var t = Table(new Col("Date"), new Col("Enclosure"), new Col("Result"), new Col("Issue type"),
+                      new Col("Findings"), new Col("Inspector"), new Col("Work order"));
+        await using var cmd = Cmd(conn, $@"
+            SELECT i.Inspection_Date, e.Enclosure_ID, e.Enclosure_Name, i.Result, i.Issue_Category, i.Findings,
+                   CONCAT(emp.First_Name, ' ', emp.Last_Name), m.Maintenance_ID, m.Status
+            FROM Habitat_Inspection i
+            JOIN Enclosure e ON e.Enclosure_ID = i.Enclosure_ID
+            LEFT JOIN Employee emp ON emp.Employee_ID = i.Inspector_Employee_ID
+            LEFT JOIN Maintenance m ON m.Inspection_ID = i.Inspection_ID
+            WHERE {where}
+            ORDER BY i.Inspection_Date DESC
+            LIMIT 500");
+        if (k != null) cmd.Parameters.AddWithValue("@k", k);
+        await using var r = await cmd.ExecuteReaderAsync();
+        while (await r.ReadAsync())
+        {
+            var result = r.GetString(3);
+            t.Rows.Add(R(new[]
+            {
+                D(r.GetDateTime(0)), T(r.GetString(2), $"/Animals/EnclosureDetails/{r.GetInt32(1)}"), T(result),
+                T(Str(r, 4)), T(Str(r, 5)), T(Str(r, 6)),
+                r.IsDBNull(7) ? T("—") : T($"#{r.GetInt32(7)} ({Str(r, 8) ?? "Open"})", $"/Staff/MaintenanceEdit/{r.GetInt32(7)}")
+            }, result == "Critical" ? "bad" : result == "Minor Issues" ? "warn" : null));
+        }
+        ResultTitle = "Inspections: " + string.Join(" · ", title);
+        t.Note = "Red: critical. Yellow: minor issues. Shows up to 500 inspections.";
+        return t;
     }
 
-    public class CategoryRow
+    // ===== Source records: work orders =====
+    private async Task<ReportTable> RepairsAsync(MySqlConnection conn)
     {
-        public string Category { get; set; } = "";
-        public int Findings { get; set; }
-        public int Critical { get; set; }
-        public int Enclosures { get; set; }
-        public DateTime LastSeen { get; set; }
+        var kind = Key2 ?? "all";
+        bool ever = kind.EndsWith("-ever");     // open repairs: as of today, ignoring the date range
+        if (ever) kind = kind[..^5];
+        if (!RepairKinds.ContainsKey(kind)) kind = "all";
+
+        var where = (ever
+                ? "m.Enclosure_ID IS NOT NULL" + (EnclosureId != null ? " AND m.Enclosure_ID = @enclosure" : "")
+                : RepairWhere)
+            + " AND " + RepairKinds[kind].Sql;
+        var title = new List<string> { RepairKinds[kind].Label };
+        var (type, text) = SplitKey(Key);
+        object? k = null;
+        switch (type)
+        {
+            case "m": where += " AND DATE_FORMAT(m.Request_Date, '%Y-%m') = @k"; k = text; title.Add(MonthName(text)); break;
+            case "e": where += " AND m.Enclosure_ID = @k"; k = text; title.Add(OptionName(_enclosures, IntOrNull(text)) ?? "enclosure"); break;
+        }
+
+        var t = Table(new Col("Work order"), new Col("Enclosure"), new Col("Description"), new Col("Priority"),
+                      new Col("Status"), new Col("Requested"), new Col("Completed"), new Col("Cost", true));
+        await using var cmd = Cmd(conn, $@"
+            SELECT m.Maintenance_ID, e.Enclosure_ID, e.Enclosure_Name, m.Description, m.Priority, COALESCE(m.Status, 'Open'),
+                   m.Request_Date, m.Completion_Date, m.Cost
+            FROM Maintenance m
+            JOIN Enclosure e ON e.Enclosure_ID = m.Enclosure_ID
+            WHERE {where}
+            ORDER BY m.Request_Date DESC
+            LIMIT 500");
+        if (k != null) cmd.Parameters.AddWithValue("@k", k);
+        await using var r = await cmd.ExecuteReaderAsync();
+        decimal total = 0;
+        while (await r.ReadAsync())
+        {
+            var cost = Dec(r, 8);
+            total += cost;
+            var status = r.GetString(5);
+            t.Rows.Add(R(new[]
+            {
+                T("#" + r.GetInt32(0), $"/Staff/MaintenanceEdit/{r.GetInt32(0)}"),
+                T(r.GetString(2), $"/Animals/EnclosureDetails/{r.GetInt32(1)}"), T(Str(r, 3)), T(Str(r, 4)), T(status),
+                D(DateOrNull(r, 6)), DateOrNull(r, 7) == null ? T("—") : D(DateOrNull(r, 7)), Money(cost)
+            }, status is "Completed" or "Cancelled" ? null : Str(r, 4) == "Emergency" ? "bad" : "warn"));
+        }
+        if (t.Rows.Count > 0)
+            t.Total = R(new[] { T("Total"), T(""), T(""), T(""), T(""), T(""), T(""), Money(total) });
+        ResultTitle = "Work orders: " + string.Join(" · ", title) + (ever ? " (as of today)" : "");
+        t.Note = "Yellow: not finished. Red: emergency not finished. Click a work order to open it.";
+        return t;
     }
 
-    public class FollowUpRow
+    private class MonthAgg
     {
-        public DateTime Date { get; set; }
-        public string Enclosure { get; set; } = "";
-        public string Result { get; set; } = "";
-        public string Category { get; set; } = "";
-        public string? Findings { get; set; }
-        public string? Inspector { get; set; }
-        public int? MaintenanceId { get; set; }
-        public string? Priority { get; set; }
-        public string RepairStatus { get; set; } = "";
-        public int? Days { get; set; }
-        // Critical problems should be fixed within a week; anything with no work order needs attention
-        public bool Late => MaintenanceId == null || (Result == "Critical" && Days > 7);
-    }
-
-    public class MonthRow
-    {
-        public string YearMonth { get; set; } = "";
-        public int Inspections { get; set; }
-        public int Minor { get; set; }
-        public int Critical { get; set; }
-        public int Requested { get; set; }
-        public int Completed { get; set; }
-        public decimal Cost { get; set; }
-    }
-
-    public class WorkRow
-    {
-        public int Id { get; set; }
-        public string Enclosure { get; set; } = "";
-        public string? Description { get; set; }
-        public string Priority { get; set; } = "";
-        public string Status { get; set; } = "";
-        public DateTime? Requested { get; set; }
-        public int? DaysOpen { get; set; }
-        public string? AssignedTo { get; set; }
+        public int Insp, Minor, Crit, Req, Done;
+        public decimal Cost;
     }
 }

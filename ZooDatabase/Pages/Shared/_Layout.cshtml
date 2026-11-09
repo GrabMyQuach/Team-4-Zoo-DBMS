@@ -10,28 +10,33 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - Zoo Management</title>
+    <title>@ViewData["Title"] · @PublicSite.ZooName Staff</title>
     <script type="importmap"></script>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/ZooDatabase.styles.css" asp-append-version="true" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/staff-theme.css" asp-append-version="true" />
 </head>
 <body>
     <header>
-        <nav class="navbar navbar-light bg-white border-bottom box-shadow mb-3">
+        <nav class="navbar staff-bar mb-4">
             <div class="container">
-                <a class="navbar-brand" href="/">
-                    <img src="/images/zoo-logo.jpg" alt="Zoo Management home" style="height: 60px;" />
+                <a class="navbar-brand staff-brand" href="@(User.Identity?.IsAuthenticated == true ? "/Dashboard" : "/")">
+                    @PublicSite.ZooName <span class="staff-tag">Staff</span>
                 </a>
                 @if (User.Identity?.IsAuthenticated == true)
                 {
-                    <div class="d-flex align-items-center">
-                        <a asp-page="/MyAccount" class="navbar-text me-3 text-decoration-none text-dark">
+                    <div class="d-flex flex-wrap align-items-center gap-3">
+                        <a href="/" class="staff-link">View public site</a>
+                        <a asp-page="/MyAccount" class="staff-user">
                             @User.Identity.Name
-                            <span class="badge bg-success ms-1">@User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value</span>
+                            <span class="staff-role">@User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value</span>
                         </a>
                         <form method="post" asp-page="/Logout" class="d-inline">
-                            <button type="submit" class="btn btn-outline-secondary btn-sm">Log out</button>
+                            <button type="submit" class="btn btn-sm staff-logout">Log out</button>
                         </form>
                     </div>
                 }
@@ -60,7 +65,7 @@
 
     <footer class="border-top footer text-muted">
         <div class="container">
-            &copy; 2026 Team 4 Zoo Management System · <a asp-area="" asp-page="/Privacy">Privacy Policy</a>
+            &copy; 2026 @PublicSite.ZooName · Team 4 Zoo Management System · <a asp-area="" asp-page="/Privacy">Privacy Policy</a>
         </div>
     </footer>
 

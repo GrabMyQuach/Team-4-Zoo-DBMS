@@ -1,0 +1,19 @@
+@model string
+@using ZooDatabase.Data
+@{
+    // Left menu on the buying pages. The model is which item is selected: tickets, membership, shop or cart.
+    int cartCount = Cart.Load(Context.Session).ItemCount;
+    var items = new (string Key, string Url, string Title)[]
+    {
+        ("tickets", "/visit/tickets", "General Admission"),
+        ("membership", "/visit/membership", "Memberships"),
+        ("shop", "/visit/shop", "Shop Online"),
+        ("cart", "/visit/cart", $"Your Cart ({cartCount})")
+    };
+}
+<nav class="buy-nav" aria-label="Buy">
+    @foreach (var i in items)
+    {
+        <a href="@i.Url" class="@(i.Key == Model ? "is-active" : "")" aria-current="@(i.Key == Model ? "page" : null)">@i.Title</a>
+    }
+</nav>

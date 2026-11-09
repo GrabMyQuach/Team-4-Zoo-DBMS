@@ -1,0 +1,163 @@
+@model ZooDatabase.Pages.Reports.RunnableReport
+@using ZooDatabase.Pages.Reports
+@{
+    // Shared layout for every report: the "pick a view and filters, then Run Report" form,
+    // then one table. Numbers that are links open the records behind them.
+    var view = Model.CurrentView;
+    var t = Model.Result;
+}
+
+<div class="border-bottom pb-3 mb-4 d-flex flex-wrap justify-content-between align-items-end gap-3">
+    <h1 class="h2 mb-0">@Model.ReportTitle</h1>
+    @if (t != null)
+    {
+        <div class="d-flex gap-2 no-print">
+            <a href="@Model.ExcelUrl" class="btn btn-outline-primary px-4">Download Excel</a>
+            <button type="button" onclick="window.print()" class="btn btn-outline-primary px-4">Save as PDF</button>
+        </div>
+    }
+</div>
+
+@if (Model.IsDrill)
+{
+    <a href="@Model.BackUrl" class="back-link mt-0 mb-3 d-inline-block no-print">← Back to @(Model.BackView?.Title ?? "report")</a>
+}
+else
+{
+    <form method="get" class="card mb-4 no-print">
+        <div class="card-body">
+            <input type="hidden" name="Run" value="true" />
+            <div class="row g-3 align-items-end">
+                <div class="col-12 col-lg-4">
+                    <label class="form-label" for="View">Report</label>
+                    <select id="View" name="View" class="form-select">
+                        @foreach (var v in Model.Views.Where(v => !v.Hidden))
+                        {
+                            <option value="@v.Key" selected="@(v.Key == view.Key)">@v.Title</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-6 col-lg-2">
+                    <label class="form-label" for="From">From</label>
+                    <input id="From" name="From" type="date" class="form-control" value="@Model.StartDate.ToString("yyyy-MM-dd")" />
+                </div>
+                <div class="col-6 col-lg-2">
+                    <label class="form-label" for="To">To</label>
+                    <input id="To" name="To" type="date" class="form-control" value="@Model.EndDate.ToString("yyyy-MM-dd")" />
+                </div>
+                @foreach (var f in Model.Filters)
+                {
+                    <div class="col-6 col-lg-2">
+                        <label class="form-label" for="@f.Name">@f.Label</label>
+                        <select id="@f.Name" name="@f.Name" class="form-select">
+                            <option value="">All</option>
+                            @foreach (var o in f.Options)
+                            {
+                                <option value="@o.Id" selected="@(o.Id.ToString() == f.Selected)">@o.Name</option>
+                            }
+                        </select>
+                    </div>
+                }
+                <div class="col-12 col-lg-auto">
+                    <button type="submit" class="btn btn-primary px-4">Run Report</button>
+                </div>
+            </div>
+            <ul class="report-view-help mt-3 mb-0">
+                @foreach (var v in Model.Views.Where(v => !v.Hidden))
+                {
+                    <li><strong>@v.Title:</strong> @v.Description</li>
+                }
+            </ul>
+        </div>
+    </form>
+}
+
+@if (t == null)
+{
+    <p class="text-muted">Choose a report, dates and filters above, then select <strong>Run Report</strong>.</p>
+}
+else
+{
+    <div class="print-only mb-3 small text-muted">
+        Generated @DateTime.Now.ToString("MMM d, yyyy h:mm tt") by @User.Identity?.Name
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mb-3">
+                <h2 class="h4 section-heading mb-0">@Model.ResultTitle</h2>
+                <span class="text-muted small">
+                    @(view.UsesDates ? Model.DateRangeText : "As of today")@(Model.FilterText == "" ? "" : " · " + Model.FilterText)
+                </span>
+            </div>
+
+            @if (t.Rows.Count == 0)
+            {
+                <p class="text-muted mb-0">@t.EmptyText</p>
+            }
+            else
+            {
+                <table class="table table-hover align-middle mb-0 report-table">
+                    <thead>
+                        <tr>
+                            @foreach (var c in t.Cols)
+                            {
+                                <th class="@(c.Num ? "text-end" : "")">@c.Title</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in t.Rows)
+                        {
+                            <tr class="@(r.Tone == "bad" ? "row-bad" : r.Tone == "warn" ? "row-warn" : "")">
+                                @for (int i = 0; i < r.Cells.Count; i++)
+                                {
+                                    var c = r.Cells[i];
+                                    var link = c.Link ?? (i == 0 ? r.Link : null);
+                                    var num = i < t.Cols.Count && t.Cols[i].Num;
+                                    <td class="@(num ? "text-end" : "")">
+                                        @if (link != null)
+                                        {
+                                            <a href="@link" class="@(num ? "drill-link" : "fw-semibold")">@c.Text</a>
+                                        }
+                                        else
+                                        {
+                                            @c.Text
+                                        }
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                    @if (t.Total != null)
+                    {
+                        <tfoot>
+                            <tr class="report-total">
+                                @for (int i = 0; i < t.Total.Cells.Count; i++)
+                                {
+                                    var c = t.Total.Cells[i];
+                                    var num = i < t.Cols.Count && t.Cols[i].Num;
+                                    <td class="@(num ? "text-end" : "")">
+                                        @if (c.Link != null)
+                                        {
+                                            <a href="@c.Link" class="drill-link">@c.Text</a>
+                                        }
+                                        else
+                                        {
+                                            @c.Text
+                                        }
+                                    </td>
+                                }
+                            </tr>
+                        </tfoot>
+                    }
+                </table>
+            }
+
+            @if (!string.IsNullOrEmpty(t.Note))
+            {
+                <p class="text-muted small mt-3 mb-0">@t.Note</p>
+            }
+        </div>
+    </div>
+}

@@ -9,7 +9,7 @@
     bool inAdmin = path.StartsWith("/ManageUsers", StringComparison.OrdinalIgnoreCase)
                 || path.StartsWith("/AddUser", StringComparison.OrdinalIgnoreCase)
                 || path.StartsWith("/EditUser", StringComparison.OrdinalIgnoreCase);
-    bool inProducts = path == "/" || path.Equals("/Index", StringComparison.OrdinalIgnoreCase);
+    bool inProducts = path.Equals("/Dashboard", StringComparison.OrdinalIgnoreCase);
 
     var reportLinks = new (string Url, string Title, string Roles)[]
     {
@@ -24,7 +24,7 @@
 <div class="module-sidebar main-menu">
     <div class="module-title">Main menu</div>
     <nav class="nav flex-column">
-        <a class="nav-link @(inProducts ? "active" : "")" href="/">Home</a>
+        <a class="nav-link @(inProducts ? "active" : "")" href="/Dashboard">Home</a>
 
         @if (ReportAccess.CanView(User))
         {

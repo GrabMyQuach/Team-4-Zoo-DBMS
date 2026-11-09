@@ -1,0 +1,11 @@
+@model ZooDatabase.Pages.Visit.AnimalCard
+@{
+    var bg = Model.Photo != null ? $"background-color:{Model.Tint};background-image:url('{Model.Photo}')" : $"background-color:{Model.Tint}";
+}
+<article class="animal-card">
+    <div class="animal-photo" style="@bg" role="img" aria-label="@Model.Name the @Model.Species"></div>
+    <div class="animal-body">
+        <h3>@Model.Name</h3>
+        <p>@Model.Species · @Model.Enclosure</p>
+    </div>
+</article>

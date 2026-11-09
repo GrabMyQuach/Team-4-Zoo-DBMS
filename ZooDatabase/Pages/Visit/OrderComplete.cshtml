@@ -1,0 +1,59 @@
+@page "/visit/order-complete"
+@model ZooDatabase.Pages.Visit.OrderCompleteModel
+@{
+    ViewData["Title"] = "Order Complete";
+    var o = Model.Order;
+}
+
+<section class="page-banner">
+    <div class="pub-wrap">
+        <h1>Thank you, @o.Name!</h1>
+    </div>
+</section>
+
+<section class="pub-section pub-section--sand">
+    <div class="pub-wrap">
+        <div class="cart-box confirm-box">
+            <p class="pub-lead">Your order is confirmed. A copy would be sent to <strong>@o.Email</strong>.</p>
+
+            @if (o.TicketOrderId.HasValue)
+            {
+                <div class="confirm-row">
+                    <h3>Tickets · Order #@o.TicketOrderId</h3>
+                    <p>Visit date: @o.VisitDate. Show this order number at the front gate.</p>
+                </div>
+            }
+            @if (o.MembershipId.HasValue)
+            {
+                <div class="confirm-row">
+                    <h3>Membership · #@o.MembershipId</h3>
+                    <p>@o.MembershipText</p>
+                </div>
+            }
+            @if (o.ShopOrderIds.Count > 0)
+            {
+                <div class="confirm-row">
+                    <h3>Gift shop · Order @(string.Join(", ", o.ShopOrderIds.Select(id => "#" + id)))</h3>
+                    <p>Pick up at @(string.Join(" and ", o.PickupShops.Distinct())) during your visit.</p>
+                </div>
+            }
+
+            <table class="cart-table">
+                <tbody>
+                    @foreach (var l in o.Lines)
+                    {
+                        <tr><td>@l.Qty × @l.Name</td><td class="num">@l.Total.ToString("C")</td></tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr><td><strong>Total paid (@o.Payment)</strong></td><td class="num"><strong>@o.Total.ToString("C")</strong></td></tr>
+                </tfoot>
+            </table>
+
+            <div class="pub-actions">
+                <a class="pub-btn pub-btn--accent" href="/">Back to home</a>
+                <a class="pub-link" href="/visit/animals">Meet the animals →</a>
+            </div>
+        </div>
+    </div>
+</section>

@@ -19,6 +19,15 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 
 builder.Services.AddAuthorization();
 
+// Shopping cart for the public website (kept on the server for 2 hours per visitor)
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromHours(2);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
+
 // 2. Every page requires login, except these
 builder.Services.AddRazorPages(options =>
 {
@@ -26,6 +35,8 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AllowAnonymousToPage("/Login");
     options.Conventions.AllowAnonymousToPage("/AccessDenied");
     options.Conventions.AllowAnonymousToPage("/Error");
+    // The public website (homepage, animals, tickets, membership) is open to everyone
+    options.Conventions.AllowAnonymousToFolder("/Visit");
 });
 
 var app = builder.Build();
@@ -50,6 +61,7 @@ app.UseRouting();
 // 3. Check who you are, then what you're allowed to do
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseSession();
 
 app.MapStaticAssets();
 app.MapRazorPages().WithStaticAssets();
