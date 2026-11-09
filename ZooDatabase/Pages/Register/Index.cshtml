@@ -1,0 +1,51 @@
+@page
+@model ZooDatabase.Pages.Register.IndexModel
+@{
+    ViewData["Title"] = "Register";
+    var hour = DateTime.Now.Hour;
+    var greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+}
+
+<partial name="_RegisterNav" model="@("home")" />
+
+<h1 class="mb-1">@greeting, @Model.FirstName</h1>
+<p class="text-muted mb-4">@DateTime.Today.ToString("dddd, MMMM d, yyyy") · What would you like to do?</p>
+
+<div class="register-cards">
+    <a href="/Register/Tickets" class="register-card">
+        <svg viewBox="0 0 64 64" width="96" height="96" aria-hidden="true">
+            <path d="M6 18h52v8a6 6 0 0 0 0 12v8H6v-8a6 6 0 0 0 0-12z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round" />
+            <path d="M42 18v28" fill="none" stroke="currentColor" stroke-width="4" stroke-dasharray="4 4" />
+            <path d="M16 28h16M16 36h12" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" />
+        </svg>
+        <span class="register-card-title">Sell Tickets</span>
+        <span class="register-card-text">Admission at the front gate</span>
+    </a>
+    <a href="/Register/Shop" class="register-card">
+        <svg viewBox="0 0 64 64" width="96" height="96" aria-hidden="true">
+            <path d="M8 24l5-14h38l5 14" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round" />
+            <path d="M8 24a8 6 0 0 0 16 0a8 6 0 0 0 16 0a8 6 0 0 0 16 0" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round" />
+            <path d="M12 30v24h40V30" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round" />
+            <path d="M26 54V40h12v14" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round" />
+        </svg>
+        <span class="register-card-title">Food &amp; Gift Sale</span>
+        <span class="register-card-text">Ring up a food stand or gift shop order</span>
+    </a>
+    <a href="/Register/Members" class="register-card">
+        <svg viewBox="0 0 64 64" width="96" height="96" aria-hidden="true">
+            <rect x="6" y="14" width="52" height="36" rx="6" fill="none" stroke="currentColor" stroke-width="4" />
+            <circle cx="22" cy="30" r="6" fill="none" stroke="currentColor" stroke-width="4" />
+            <path d="M13 44c2-6 6-8 9-8s7 2 9 8M36 26h14M36 34h10" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" />
+        </svg>
+        <span class="register-card-title">Check a Member</span>
+        <span class="register-card-text">See if someone's membership is active</span>
+    </a>
+    <a href="/Register/Today" class="register-card">
+        <svg viewBox="0 0 64 64" width="96" height="96" aria-hidden="true">
+            <path d="M16 6h32v52l-6-4-5 4-5-4-5 4-5-4-6 4z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round" />
+            <path d="M24 20h16M24 30h16M24 40h10" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" />
+        </svg>
+        <span class="register-card-title">Today's Sales</span>
+        <span class="register-card-text">Every sale made today, with totals</span>
+    </a>
+</div>

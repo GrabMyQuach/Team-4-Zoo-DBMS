@@ -13,7 +13,7 @@ public static class ReportAccess
     public const string Feeding = "DBA,SuperUser,Zookeeper";
 
     // Facility safety and repair costs are a management concern.
-    public const string HabitatSafety = "DBA,SuperUser";
+    public const string HabitatSafety = "DBA,SuperUser,Zookeeper";
 
     // Labor cost and staff attendance are a management concern.
     public const string Staffing = "DBA,SuperUser";

@@ -1,0 +1,87 @@
+@page
+@model ZooDatabase.Pages.Care.ProblemModel
+@using ZooDatabase.Data
+@{
+    ViewData["Title"] = "Report a Problem";
+}
+
+<partial name="_CareNav" model="@("problem")" />
+
+<h1 class="mb-1">Report a Problem</h1>
+<p class="text-muted mb-4">Broken fence, water issue, anything unsafe. It goes straight to maintenance as a work order.</p>
+
+@if (Model.ErrorMessage != null)
+{
+    <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
+}
+
+<form method="post" class="card mb-4" style="max-width: 760px">
+    <div class="card-body">
+        <div class="mb-3">
+            <label for="EnclosureId" class="form-label">Where?</label>
+            <select id="EnclosureId" name="EnclosureId" class="form-select form-select-lg">
+                @if (Model.MyEnclosures.Count > 0)
+                {
+                    <optgroup label="Your enclosures">
+                        @foreach (var e in Model.MyEnclosures)
+                        {
+                            <option value="@e.Id" selected="@(e.Id == Model.EnclosureId)">@e.Name</option>
+                        }
+                    </optgroup>
+                }
+                <optgroup label="@(Model.MyEnclosures.Count > 0 ? "Other enclosures" : "Enclosures")">
+                    @foreach (var e in Model.OtherEnclosures)
+                    {
+                        <option value="@e.Id" selected="@(e.Id == Model.EnclosureId)">@e.Name</option>
+                    }
+                </optgroup>
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="Description" class="form-label">What's wrong?</label>
+            <textarea id="Description" name="Description" class="form-control" rows="3" required>@Model.Description</textarea>
+        </div>
+        <fieldset class="mb-3">
+            <legend class="form-label">How urgent?</legend>
+            <div class="pos-pay care-priority">
+                @foreach (var p in StaffOptions.MaintenancePriorities)
+                {
+                    <label class="pos-pay-option">
+                        <input type="radio" name="Priority" value="@p" checked="@(p == Model.Priority)" />
+                        <span>@(p == "Emergency" ? "Emergency (animals or people at risk)" : p)</span>
+                    </label>
+                }
+            </div>
+        </fieldset>
+        <button type="submit" class="btn btn-primary btn-lg px-4">Send to maintenance</button>
+    </div>
+</form>
+
+<h2 class="h4 section-heading mb-3">Already reported</h2>
+@if (Model.OpenOrders.Count == 0)
+{
+    <p class="text-muted">No open work orders for your enclosures.</p>
+}
+else
+{
+    <div class="card"><div class="card-body">
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead><tr><th>#</th><th>Enclosure</th><th>Problem</th><th>Priority</th><th>Status</th><th>Reported</th></tr></thead>
+                <tbody>
+                    @foreach (var o in Model.OpenOrders)
+                    {
+                        <tr>
+                            <td>@o.Id</td>
+                            <td>@o.Enclosure</td>
+                            <td>@o.Description</td>
+                            <td><span class="badge @(o.Priority is "Emergency" or "High" ? "bg-danger" : "bg-secondary")">@o.Priority</span></td>
+                            <td>@o.Status</td>
+                            <td>@(o.Requested?.ToString("MMM d") ?? "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div></div>
+}

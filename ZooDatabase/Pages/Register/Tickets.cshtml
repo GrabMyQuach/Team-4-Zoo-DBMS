@@ -1,0 +1,39 @@
+@page
+@model ZooDatabase.Pages.Register.TicketsModel
+@{
+    ViewData["Title"] = "Sell Tickets";
+}
+
+<partial name="_RegisterNav" model="@("tickets")" />
+
+<h1 class="mb-1">Sell Tickets</h1>
+<p class="text-muted mb-4">For today's visit · @DateTime.Today.ToString("dddd, MMM d")</p>
+
+@if (Model.Done != null)
+{
+    <div class="alert alert-success d-flex flex-wrap justify-content-between align-items-center gap-2" role="status">
+        <span>@Model.Done</span>
+        @if (Model.ReceiptUrl != null)
+        {
+            <a href="@Model.ReceiptUrl" class="btn btn-sm btn-primary">Print receipt</a>
+        }
+    </div>
+}
+@if (Model.ErrorMessage != null)
+{
+    <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
+}
+
+@{
+    Model.Pos.Lookup = Model.CustomerLookup;
+    Model.Pos.FirstName = Model.FirstName;
+    Model.Pos.LastName = Model.LastName;
+}
+@{ Model.Pos.Start = Model.Qty; }
+<partial name="_Pos" model="Model.Pos" />
+
+<p class="text-muted small mt-3">Member Admission is free: check their membership on <a href="/Register/Members">Check a Member</a> first.</p>
+
+@section Scripts {
+    <script src="~/js/register.js" asp-append-version="true"></script>
+}

@@ -19,6 +19,13 @@ public static class SalesOptions
     public static bool CanSell(ClaimsPrincipal user) => SalesRoles.Split(',').Any(user.IsInRole);
     public static bool CanManage(ClaimsPrincipal user) => user.IsInRole("DBA");
 
+    // A cashier with no office role: they get the simple register instead of the full staff screens
+    public static bool IsCashierOnly(ClaimsPrincipal user) =>
+        user.IsInRole("Cashier") && !user.IsInRole("DBA") && !user.IsInRole("SuperUser") && !user.IsInRole("Admin");
+
+    // Payment methods offered at a counter
+    public static readonly string[] CounterPayments = { "Cash", "Credit Card", "Debit Card", "Mobile Pay" };
+
     // Read-only visitors never see customer emails or phone numbers
     public static bool CanSeeContact(ClaimsPrincipal user) =>
         user.Identity?.IsAuthenticated == true && !user.IsInRole("Customer");

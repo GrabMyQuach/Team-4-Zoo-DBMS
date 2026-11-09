@@ -32,6 +32,13 @@ public class IndexModel : PageModel
         return true;
     }
 
+    // Cashiers skip the dashboard and land on their register
+    public override void OnPageHandlerExecuting(Microsoft.AspNetCore.Mvc.Filters.PageHandlerExecutingContext context)
+    {
+        if (SalesOptions.IsCashierOnly(User)) context.Result = Redirect("/Register");
+        else if (CareOptions.LandsOnCare(User)) context.Result = Redirect("/Care");
+    }
+
     public async Task OnGetAsync()
     {
         DisplayName = User.Identity?.Name ?? "";

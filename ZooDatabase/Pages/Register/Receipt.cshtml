@@ -1,0 +1,68 @@
+@page
+@model ZooDatabase.Pages.Register.ReceiptModel
+@using ZooDatabase.Data
+@{
+    ViewData["Title"] = "Receipt " + Model.Number;
+}
+
+<div class="d-flex flex-wrap justify-content-between gap-2 mb-3 no-print">
+    <a href="/Register/Today" class="back-link mt-0">← Today's Sales</a>
+    <button type="button" class="btn btn-primary px-4" onclick="window.print()">Print receipt</button>
+</div>
+
+<article class="receipt" aria-label="Receipt @Model.Number">
+    <header class="receipt-head">
+        <div class="receipt-zoo">@PublicSite.ZooName</div>
+        <div>@PublicSite.City</div>
+        <div>@Model.Location</div>
+    </header>
+
+    <div class="receipt-rule"></div>
+    <div class="receipt-row"><span>@Model.Title</span><span>@Model.Number</span></div>
+    <div class="receipt-row"><span>@Model.When.ToString("MM/dd/yyyy")</span><span>@Model.When.ToString("h:mm tt")</span></div>
+    @if (Model.Cashier != null)
+    {
+        <div class="receipt-row"><span>Cashier</span><span>@Model.Cashier</span></div>
+    }
+    @if (Model.Customer != null)
+    {
+        <div class="receipt-row"><span>Customer</span><span>@Model.Customer</span></div>
+    }
+    @if (Model.VisitDate != null)
+    {
+        <div class="receipt-row"><span>Valid for</span><span>@Model.VisitDate.Value.ToString("ddd MM/dd/yyyy")</span></div>
+    }
+    <div class="receipt-rule"></div>
+
+    @foreach (var l in Model.Lines)
+    {
+        <div class="receipt-item">
+            <div class="receipt-row"><span>@l.Name</span><span>@l.Amount.ToString("C")</span></div>
+            @if (l.Qty > 1)
+            {
+                <div class="receipt-sub">@l.Qty @@ @l.Price.ToString("C")</div>
+            }
+        </div>
+    }
+
+    <div class="receipt-rule"></div>
+    <div class="receipt-row"><span>Subtotal (@Model.ItemCount @(Model.ItemCount == 1 ? "item" : "items"))</span><span>@Model.Subtotal.ToString("C")</span></div>
+    <div class="receipt-row"><span>Tax</span><span>@(0m.ToString("C"))</span></div>
+    <div class="receipt-row receipt-total"><span>TOTAL</span><span>@Model.Total.ToString("C")</span></div>
+    <div class="receipt-row"><span>Paid by @(Model.Payment ?? "—")</span><span>@Model.Total.ToString("C")</span></div>
+    <div class="receipt-rule"></div>
+
+    <footer class="receipt-foot">
+        @if (Model.Kind == "t")
+        {
+            <div>Show this receipt at the gate.</div>
+            <div>Tickets are valid only on the date shown.</div>
+        }
+        else
+        {
+            <div>Returns with receipt within 30 days.</div>
+        }
+        <div class="mt-2">Thank you for visiting @PublicSite.ZooName!</div>
+        <div class="receipt-barcode" aria-hidden="true">@Model.Number</div>
+    </footer>
+</article>

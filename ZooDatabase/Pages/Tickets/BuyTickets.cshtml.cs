@@ -98,6 +98,10 @@ public class BuyTicketsModel : PageModel
     [BindProperty]
     public Dictionary<int, int> Quantities { get; set; } = new();
 
+    // The payment method the customer picked (the form already asks for it)
+    [BindProperty]
+    public string? PaymentMethod { get; set; }
+
     public async Task<IActionResult> OnPostAsync()
     {
         var userIdText = User.FindFirstValue(
@@ -116,6 +120,14 @@ public class BuyTicketsModel : PageModel
         var selected = Quantities
             .Where(q => q.Value > 0)
             .ToList();
+
+        string[] onlinePayments = { "Credit Card", "Debit Card", "Mobile Pay", "PayPal" };
+        if (PaymentMethod == null || !onlinePayments.Contains(PaymentMethod))
+        {
+            ErrorMessage = "Please choose a payment method.";
+            await LoadTicketTypesAsync();
+            return Page();
+        }
 
         if (selected.Count == 0 ||
             Quantities.Any(q => q.Value < 0 || q.Value > 50))
@@ -186,15 +198,16 @@ public class BuyTicketsModel : PageModel
                     (Customer_ID, Purchase_Date, Total_Amount,
                      Payment_Method, Visit_Date)
                   VALUES
-                    (@customerId, NOW(), @total,
+                    (@customerId, @now, @total,
                      @payment, @visitDate)",
                 conn, transaction);
 
             saleCmd.Parameters.AddWithValue(
                 "@customerId", CustomerId);
             saleCmd.Parameters.AddWithValue("@total", 0m);
+            saleCmd.Parameters.AddWithValue("@now", DateTime.Now);
             saleCmd.Parameters.AddWithValue(
-                "@payment", DBNull.Value);
+                "@payment", PaymentMethod);
             saleCmd.Parameters.AddWithValue(
                 "@visitDate", VisitDate.Date);
 

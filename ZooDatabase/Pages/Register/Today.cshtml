@@ -1,0 +1,66 @@
+@page
+@model ZooDatabase.Pages.Register.TodayModel
+@{
+    ViewData["Title"] = "Today's Sales";
+}
+
+<partial name="_RegisterNav" model="@("today")" />
+
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-4">
+    <div>
+        <h1 class="mb-1">Today's Sales</h1>
+        <p class="text-muted mb-0">@DateTime.Today.ToString("dddd, MMMM d, yyyy") · @Model.Sales.Count @(Model.Sales.Count == 1 ? "sale" : "sales") · @Model.Total.ToString("C")</p>
+    </div>
+    <a href="/Register/Today" class="btn btn-outline-primary">Refresh</a>
+</div>
+
+@if (Model.Sales.Count > 0)
+{
+    <div class="register-paysum mb-4">
+        @foreach (var p in Model.ByPayment)
+        {
+            <div class="card"><div class="card-body">
+                <div class="text-muted fw-semibold">@p.Method</div>
+                <div class="register-paysum-amount">@p.Amount.ToString("C")</div>
+                <div class="text-muted small">@p.Count @(p.Count == 1 ? "sale" : "sales")</div>
+            </div></div>
+        }
+    </div>
+}
+
+<div class="card">
+    <div class="card-body">
+        @if (Model.Sales.Count == 0)
+        {
+            <p class="mb-0 text-muted">No sales yet today.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr><th>Time</th><th>Sale</th><th>Where</th><th>Items</th><th>Payment</th><th class="text-end">Total</th><th><span class="visually-hidden">Receipt</span></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in Model.Sales)
+                        {
+                            <tr>
+                                <td>@s.Time.ToString("h:mm tt")</td>
+                                <td><a href="@s.Link" class="fw-semibold">@s.Kind #@s.Id</a></td>
+                                <td>@s.Where</td>
+                                <td>@s.Items</td>
+                                <td>@(s.Payment ?? "—")</td>
+                                <td class="text-end">@s.Total.ToString("C")</td>
+                                <td class="text-end"><a href="/Register/Receipt?Kind=@(s.Kind == "Tickets" ? "t" : "s")&Id=@s.Id" class="btn btn-sm btn-outline-primary">Receipt</a></td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr class="report-total"><td colspan="5">Total</td><td class="text-end">@Model.Total.ToString("C")</td><td></td></tr>
+                    </tfoot>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+<p class="text-muted small mt-3">Includes sales rung up at every register today and tickets bought online today. Click Receipt to view or print one.</p>

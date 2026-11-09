@@ -26,6 +26,9 @@ public class HealthNewModel : PageModel
     [BindProperty(SupportsGet = true)] public int Id { get; set; }
     [BindProperty] public HealthInput Input { get; set; } = new();
 
+    // Where to go after saving (the vet's animal history page sends ?Back=/Care/History/5)
+    [BindProperty(SupportsGet = true)] public string? Back { get; set; }
+
     public string AnimalName { get; set; } = "";
     public List<VetOption> VetOptions { get; set; } = new();
     public string? ErrorMessage { get; set; }
@@ -108,7 +111,7 @@ public class HealthNewModel : PageModel
             TempData["Success"] = Input.IsContagious
                 ? await DescribeQuarantineAsync(conn, recordId)
                 : $"Exam recorded for {AnimalName}.";
-            return Redirect($"/Animals/Details/{Id}");
+            return Redirect(!string.IsNullOrEmpty(Back) && Url.IsLocalUrl(Back) ? Back : $"/Animals/Details/{Id}");
         }
         catch (MySqlException ex) when (ex.SqlState == "45000")
         {

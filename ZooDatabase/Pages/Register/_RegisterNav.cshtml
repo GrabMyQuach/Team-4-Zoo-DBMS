@@ -1,0 +1,20 @@
+@model string
+@using ZooDatabase.Data
+@*
+    Simple way back: register pages link to the register home, and office staff
+    (who can also use the register) get a link back to the main menu.
+*@
+<div class="d-flex flex-wrap justify-content-between gap-2 mb-3 no-print">
+    @if (Model != "home")
+    {
+        <a href="/Register" class="back-link mt-0">← Register home</a>
+    }
+    else
+    {
+        <span></span>
+    }
+    @if (!SalesOptions.IsCashierOnly(User))
+    {
+        <a href="/Dashboard" class="back-link mt-0">Main menu →</a>
+    }
+</div>

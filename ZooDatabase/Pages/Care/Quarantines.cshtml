@@ -1,0 +1,71 @@
+@page
+@model ZooDatabase.Pages.Care.QuarantinesModel
+@{
+    ViewData["Title"] = "Quarantines";
+}
+
+<partial name="_CareNav" model="@("quarantines")" />
+
+<h1 class="mb-1">Quarantines</h1>
+<p class="text-muted mb-4">@Model.Active.Count in quarantine now. A quarantine starts automatically when an exam is recorded as contagious.</p>
+
+@if (Model.Active.Count == 0)
+{
+    <div class="card mb-4"><div class="card-body"><p class="mb-0">No animals are in quarantine.</p></div></div>
+}
+<div class="care-list mb-5">
+    @foreach (var q in Model.Active)
+    {
+        var days = q.Start == null ? 0 : (int)(DateTime.Today - q.Start.Value.Date).TotalDays;
+        bool pastDue = q.ExpectedEnd != null && q.ExpectedEnd < DateTime.Today;
+        <div class="care-row">
+            @if (q.Photo != null)
+            {
+                <img src="@q.Photo" alt="" class="animal-thumb care-thumb" loading="lazy" />
+            }
+            else
+            {
+                <span class="animal-thumb animal-thumb--empty care-thumb" aria-hidden="true"></span>
+            }
+            <div class="care-what">
+                <a href="/Care/History/@q.AnimalId" class="fw-semibold">@q.Animal</a>
+                <span class="text-muted">@q.Species · @q.Enclosure</span>
+                <span>@(q.Reason ?? "No reason recorded")</span>
+                <span class="small @(pastDue ? "text-danger fw-semibold" : "text-muted")">
+                    Day @(days + 1) · since @(q.Start?.ToString("MMM d") ?? "—") · expected to end @(q.ExpectedEnd?.ToString("MMM d") ?? "—")@(pastDue ? " (past due, check if they can be released)" : "")
+                </span>
+            </div>
+            <div class="care-actions">
+                <a href="/Animals/HealthNew/@(q.AnimalId)?Back=/Care/History/@(q.AnimalId)" class="btn btn-outline-primary">Record exam</a>
+                <form method="post" asp-page-handler="Release">
+                    <input type="hidden" name="quarantineId" value="@q.QuarantineId" />
+                    <button type="submit" class="btn btn-primary">Release</button>
+                </form>
+            </div>
+        </div>
+    }
+</div>
+
+@if (Model.Released.Count > 0)
+{
+    <h2 class="h4 section-heading mb-3">Released in the last 60 days</h2>
+    <div class="card"><div class="card-body">
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead><tr><th>Animal</th><th>Reason</th><th>Started</th><th>Released</th><th class="text-end">Days</th></tr></thead>
+                <tbody>
+                    @foreach (var q in Model.Released)
+                    {
+                        <tr>
+                            <td><a href="/Care/History/@q.AnimalId" class="fw-semibold">@q.Animal</a></td>
+                            <td>@(q.Reason ?? "—")</td>
+                            <td>@(q.Start?.ToString("MMM d, yyyy") ?? "—")</td>
+                            <td>@(q.Ended?.ToString("MMM d, yyyy") ?? "—")</td>
+                            <td class="text-end">@(q.Start != null && q.Ended != null ? ((int)(q.Ended.Value - q.Start.Value).TotalDays).ToString() : "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div></div>
+}

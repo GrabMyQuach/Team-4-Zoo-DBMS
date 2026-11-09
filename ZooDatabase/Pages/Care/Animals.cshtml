@@ -1,0 +1,42 @@
+@page
+@model ZooDatabase.Pages.Care.MyAnimalsModel
+@using ZooDatabase.Pages.Care
+@{
+    ViewData["Title"] = "My Animals";
+}
+
+<partial name="_CareNav" model="@("animals")" />
+
+<h1 class="mb-1">My Animals</h1>
+<p class="text-muted mb-4">@Model.Animals.Count in your care · animals needing attention first</p>
+
+@if (Model.Animals.Count == 0)
+{
+    <div class="card"><div class="card-body"><p class="mb-0">You aren't assigned to any animals yet. Ask a manager to assign you.</p></div></div>
+}
+<div class="care-animals">
+    @foreach (var a in Model.Animals)
+    {
+        <a href="/Animals/Details/@a.Id" class="care-animal">
+            @if (a.Photo != null)
+            {
+                <img src="@a.Photo" alt="" loading="lazy" />
+            }
+            else
+            {
+                <span class="care-animal-empty" aria-hidden="true"></span>
+            }
+            <span class="care-animal-body">
+                <span class="care-animal-name">@a.Name</span>
+                <span class="text-muted">@a.Species · @a.Enclosure</span>
+                <span class="d-flex flex-wrap gap-2 mt-1">
+                    <span class="badge @CareData.HealthBadge(a.Health)">@(a.Health ?? "Unknown")</span>
+                    @if (a.FeedingsToday > 0)
+                    {
+                        <span class="badge @(a.FedToday >= a.FeedingsToday ? "bg-success" : "bg-light text-dark border")">Fed @a.FedToday of @a.FeedingsToday today</span>
+                    }
+                </span>
+            </span>
+        </a>
+    }
+</div>

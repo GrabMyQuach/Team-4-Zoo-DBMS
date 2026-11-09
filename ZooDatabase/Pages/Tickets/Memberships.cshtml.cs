@@ -31,6 +31,12 @@ public class MembershipsModel : PageModel
     public int NewThisMonth => All.Count(m => m.Start >= new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1) && m.Start <= DateTime.Today);
     public decimal ActiveValue => All.Where(m => m.Status is "Active" or "Expiring Soon").Sum(m => m.Price);
 
+    // Cashiers only need to check who is a member, not membership values
+    public override void OnPageHandlerExecuting(Microsoft.AspNetCore.Mvc.Filters.PageHandlerExecutingContext context)
+    {
+        if (SalesOptions.IsCashierOnly(User)) context.Result = Redirect("/Register/Members");
+    }
+
     public async Task OnGetAsync()
     {
         await using var conn = new MySqlConnection(_config.GetConnectionString("ZooDb"));

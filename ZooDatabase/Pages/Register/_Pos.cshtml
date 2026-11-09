@@ -1,0 +1,69 @@
+@model ZooDatabase.Pages.Register.PosView
+@using ZooDatabase.Data
+@*
+    The register itself: tap an item button to add it, fix quantities on the receipt,
+    pick a payment method, Complete Sale. register.js keeps the receipt and hidden fields in sync.
+*@
+<form method="post" class="pos" data-pos>
+    @foreach (var h in Model.Hidden)
+    {
+        <input type="hidden" name="@h.Key" value="@h.Value" />
+    }
+
+    <div class="pos-items" role="group" aria-label="Items">
+        @if (Model.Items.Count == 0)
+        {
+            <p class="text-muted">There's nothing to sell here yet.</p>
+        }
+        @foreach (var i in Model.Items)
+        {
+            <button type="button" class="pos-item" data-id="@i.Id" data-name="@i.Name" data-price="@i.Price.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" data-max="@i.Max" data-start="@Model.Start.GetValueOrDefault(i.Id)" disabled="@(i.Max <= 0)">
+                <span class="pos-item-name">@i.Name</span>
+                @if (!string.IsNullOrWhiteSpace(i.Detail)) { <span class="pos-item-detail">@i.Detail</span> }
+                <span class="pos-item-price">@(i.Max <= 0 ? "Sold out" : i.Price.ToString("C"))</span>
+            </button>
+        }
+    </div>
+
+    <aside class="pos-receipt" aria-label="Current sale">
+        <h2 class="h4">Current sale</h2>
+        <div class="pos-lines" data-pos-lines aria-live="polite"></div>
+        <p class="text-muted mb-0" data-pos-empty>Tap items to add them.</p>
+        <div data-pos-inputs></div>
+
+        <div class="pos-total"><span>Total</span><span data-pos-total>$0.00</span></div>
+
+        @if (Model.ShowCustomer)
+        {
+            <label for="CustomerLookup" class="form-label mt-3">Customer email or phone</label>
+            <input id="CustomerLookup" name="CustomerLookup" class="form-control" value="@Model.Lookup" required autocomplete="off" />
+            <p class="form-text mb-1">New customer? Add their name too.</p>
+            <div class="row g-2">
+                <div class="col-6">
+                    <label for="FirstName" class="visually-hidden">First name</label>
+                    <input id="FirstName" name="FirstName" class="form-control" value="@Model.FirstName" placeholder="First name" autocomplete="off" />
+                </div>
+                <div class="col-6">
+                    <label for="LastName" class="visually-hidden">Last name</label>
+                    <input id="LastName" name="LastName" class="form-control" value="@Model.LastName" placeholder="Last name" autocomplete="off" />
+                </div>
+            </div>
+        }
+
+        <fieldset class="mt-3">
+            <legend class="form-label">Payment</legend>
+            <div class="pos-pay">
+                @foreach (var p in SalesOptions.CounterPayments)
+                {
+                    <label class="pos-pay-option">
+                        <input type="radio" name="PaymentMethod" value="@p" checked="@(p == "Cash")" />
+                        <span>@p</span>
+                    </label>
+                }
+            </div>
+        </fieldset>
+
+        <button type="submit" class="btn btn-primary btn-lg w-100 mt-3" data-pos-submit disabled>Complete Sale</button>
+        <button type="button" class="btn btn-link w-100 mt-1" data-pos-clear>Clear</button>
+    </aside>
+</form>

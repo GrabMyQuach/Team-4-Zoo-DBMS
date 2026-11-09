@@ -1,0 +1,21 @@
+@model string
+@using ZooDatabase.Data
+@* Way back to the care home, and to the main menu for office staff *@
+<div class="d-flex flex-wrap justify-content-between gap-2 mb-3 no-print">
+    @if (Model != "home")
+    {
+        <a href="/Care" class="back-link mt-0">← Home</a>
+    }
+    else
+    {
+        <span></span>
+    }
+    @if (CareOptions.IsOffice(User))
+    {
+        <a href="/Dashboard" class="back-link mt-0">Main menu →</a>
+    }
+</div>
+@if (TempData["Done"] is string done)
+{
+    <div class="alert alert-success" role="status">@done</div>
+}

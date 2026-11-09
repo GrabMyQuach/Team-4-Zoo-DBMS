@@ -18,6 +18,12 @@ public class TicketTypesModel : PageModel
     public bool CanManage => SalesOptions.CanManage(User);
     public int TotalSold => Rows.Sum(r => r.Sold30);
 
+    // Cashiers don't see ticket revenue; send them to their register
+    public override void OnPageHandlerExecuting(Microsoft.AspNetCore.Mvc.Filters.PageHandlerExecutingContext context)
+    {
+        if (SalesOptions.IsCashierOnly(User)) context.Result = Redirect("/Register/Tickets");
+    }
+
     public async Task OnGetAsync()
     {
         await using var conn = new MySqlConnection(_config.GetConnectionString("ZooDb"));

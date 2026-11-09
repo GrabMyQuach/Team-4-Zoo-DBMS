@@ -1,0 +1,146 @@
+@page "{id:int}"
+@model ZooDatabase.Pages.Care.HistoryModel
+@using ZooDatabase.Pages.Care
+@using System.Globalization
+@{
+    ViewData["Title"] = Model.Name + " · Health History";
+    var inv = CultureInfo.InvariantCulture;
+}
+
+<partial name="_CareNav" model="@("history")" />
+@if (TempData["Success"] is string saved)
+{
+    <div class="alert alert-success" role="status">@saved</div>
+}
+
+<div class="care-history-head mb-4">
+    @if (Model.Photo != null)
+    {
+        <img src="@Model.Photo" alt="" class="care-history-photo" />
+    }
+    <div class="flex-grow-1">
+        <h1 class="mb-1">@Model.Name</h1>
+        <p class="text-muted mb-2">
+            @Model.Species · @Model.Enclosure@(Model.Gender != null ? " · " + Model.Gender : "")@(Model.Born != null ? " · born " + Model.Born.Value.ToString("MMM d, yyyy") : "")
+        </p>
+        <span class="badge @CareData.HealthBadge(Model.Health)">@(Model.Health ?? "Unknown")</span>
+    </div>
+    <div class="care-actions">
+        @if (Model.CanRecord)
+        {
+            <a href="/Animals/HealthNew/@(Model.AnimalId)?Back=/Care/History/@(Model.AnimalId)" class="btn btn-primary btn-lg">Record exam &amp; weight</a>
+        }
+        <a href="/Animals/Details/@Model.AnimalId" class="btn btn-outline-primary">Full profile</a>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h2 class="h4 section-heading">Weight</h2>
+        @if (Model.Weights.Count == 0)
+        {
+            <p class="text-muted mb-0">No weights recorded yet. Add one with Record exam &amp; weight.</p>
+        }
+        else
+        {
+            var first = Model.Weights[0];
+            var latest = Model.Weights[^1];
+            var change = Model.WeightChange;
+            <div class="care-weight-stats mb-3">
+                <div><span class="text-muted">First recorded</span><strong>@first.Kg.ToString("0.##") kg</strong><span class="text-muted small">@first.Date.ToString("MMM d, yyyy")</span></div>
+                <div><span class="text-muted">Latest</span><strong>@latest.Kg.ToString("0.##") kg</strong><span class="text-muted small">@latest.Date.ToString("MMM d, yyyy")</span></div>
+                <div>
+                    <span class="text-muted">Change</span>
+                    <strong class="@(change <= -10 ? "text-danger" : change <= -5 ? "text-warning" : "")">
+                        @(change == null ? "—" : (change > 0 ? "+" : "") + change.Value.ToString("0.#") + "%")
+                    </strong>
+                    <span class="text-muted small">@Model.Weights.Count weigh-ins</span>
+                </div>
+            </div>
+
+            @if (Model.Weights.Count >= 2)
+            {
+                var pts = Model.ChartPoints();
+                var (min, max) = Model.WeightRange;
+                var line = string.Join(" ", pts.Select(p => p.X.ToString("0.#", inv) + "," + p.Y.ToString("0.#", inv)));
+                <div class="care-chart">
+                    <svg viewBox="0 0 @HistoryModel.ChartW @HistoryModel.ChartH" role="img" aria-label="Weight from @first.Kg.ToString("0.##") kg on @first.Date.ToString("MMM d, yyyy") to @latest.Kg.ToString("0.##") kg on @latest.Date.ToString("MMM d, yyyy")">
+                        @foreach (var kg in new[] { min, (min + max) / 2, max })
+                        {
+                            var y = Model.YFor(kg).ToString("0.#", inv);
+                            <line x1="@HistoryModel.PadL" x2="@(HistoryModel.ChartW - HistoryModel.PadR)" y1="@y" y2="@y" class="care-chart-grid" />
+                            @Html.Raw($"<text x=\"{HistoryModel.PadL - 8}\" y=\"{y}\" class=\"care-chart-label\" text-anchor=\"end\" dominant-baseline=\"middle\">{kg.ToString("0.#", inv)} kg</text>")
+                        }
+                        <polyline points="@line" class="care-chart-line" />
+                        @foreach (var p in pts)
+                        {
+                            <circle cx="@p.X.ToString("0.#", inv)" cy="@p.Y.ToString("0.#", inv)" r="5" class="care-chart-dot">
+                                <title>@p.W.Date.ToString("MMM d, yyyy"): @p.W.Kg.ToString("0.##") kg</title>
+                            </circle>
+                        }
+                        @Html.Raw($"<text x=\"{HistoryModel.PadL}\" y=\"{HistoryModel.ChartH - 8}\" class=\"care-chart-label\">{first.Date.ToString("MMM d, yyyy", inv)}</text>")
+                        @Html.Raw($"<text x=\"{HistoryModel.ChartW - HistoryModel.PadR}\" y=\"{HistoryModel.ChartH - 8}\" class=\"care-chart-label\" text-anchor=\"end\">{latest.Date.ToString("MMM d, yyyy", inv)}</text>")
+                    </svg>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h2 class="h4 section-heading">Exams &amp; treatment</h2>
+        @if (Model.Exams.Count == 0)
+        {
+            <p class="text-muted mb-0">No exams recorded yet.</p>
+        }
+        else
+        {
+            <ol class="care-timeline">
+                @foreach (var e in Model.Exams)
+                {
+                    <li class="@(e.Severity is "High" or "Critical" ? "is-serious" : e.Contagious ? "is-warn" : "")">
+                        <div class="care-timeline-date">@e.Date.ToString("MMM d, yyyy")</div>
+                        <div class="care-timeline-body">
+                            <div class="fw-semibold">
+                                @(e.Type ?? "Exam")@(e.Diagnosis != null ? ": " + e.Diagnosis : "")
+                                @if (e.Severity != null) { <span class="badge bg-light text-dark border ms-1">@e.Severity</span> }
+                                @if (e.Contagious) { <span class="badge bg-danger ms-1">Contagious</span> }
+                            </div>
+                            @if (e.Treatment != null) { <div>Treatment: @e.Treatment</div> }
+                            @if (e.Weight != null) { <div>Weight: @e.Weight.Value.ToString("0.##") kg</div> }
+                            @if (e.Notes != null) { <div class="text-muted">@e.Notes</div> }
+                            <div class="text-muted small">@(e.Vet ?? "Vet not recorded")</div>
+                        </div>
+                    </li>
+                }
+            </ol>
+        }
+    </div>
+</div>
+
+@if (Model.Quarantines.Count > 0)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="h4 section-heading">Quarantines</h2>
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead><tr><th>Started</th><th>Reason</th><th>Expected end</th><th>Ended</th><th>Status</th></tr></thead>
+                    <tbody>
+                        @foreach (var q in Model.Quarantines)
+                        {
+                            <tr>
+                                <td>@(q.Start?.ToString("MMM d, yyyy") ?? "—")</td>
+                                <td>@(q.Reason ?? "—")</td>
+                                <td>@(q.ExpectedEnd?.ToString("MMM d, yyyy") ?? "—")</td>
+                                <td>@(q.Ended?.ToString("MMM d, yyyy") ?? "Still in quarantine")</td>
+                                <td>@q.Status</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}

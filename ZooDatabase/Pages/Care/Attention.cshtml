@@ -1,0 +1,45 @@
+@page
+@model ZooDatabase.Pages.Care.AttentionModel
+@using ZooDatabase.Pages.Care
+@{
+    ViewData["Title"] = "Needs Attention";
+}
+
+<partial name="_CareNav" model="@("attention")" />
+
+<h1 class="mb-1">Needs Attention</h1>
+<p class="text-muted mb-4">@Model.Animals.Count @(Model.Animals.Count == 1 ? "animal" : "animals") · most serious first</p>
+
+@if (Model.Animals.Count == 0)
+{
+    <div class="card"><div class="card-body"><p class="mb-0">Every animal is healthy and up to date on checkups.</p></div></div>
+}
+<div class="care-list">
+    @foreach (var a in Model.Animals)
+    {
+        <div class="care-row">
+            @if (a.Photo != null)
+            {
+                <img src="@a.Photo" alt="" class="animal-thumb care-thumb" loading="lazy" />
+            }
+            else
+            {
+                <span class="animal-thumb animal-thumb--empty care-thumb" aria-hidden="true"></span>
+            }
+            <div class="care-what">
+                <a href="/Care/History/@a.Id" class="fw-semibold">@a.Name</a>
+                <span class="text-muted">@a.Species · @a.Enclosure · last exam @(a.LastExam?.ToString("MMM d, yyyy") ?? "never")</span>
+                <span class="d-flex flex-wrap gap-2 mt-1">
+                    @foreach (var reason in a.Reasons)
+                    {
+                        <span class="badge @(reason.Serious ? "bg-danger" : "bg-warning text-dark")">@reason.Text</span>
+                    }
+                </span>
+            </div>
+            <div class="care-actions">
+                <a href="/Animals/HealthNew/@(a.Id)?Back=/Care/History/@(a.Id)" class="btn btn-primary">Record exam</a>
+                <a href="/Care/History/@a.Id" class="btn btn-outline-primary">History</a>
+            </div>
+        </div>
+    }
+</div>

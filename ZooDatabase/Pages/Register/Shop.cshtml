@@ -1,0 +1,54 @@
+@page
+@model ZooDatabase.Pages.Register.ShopRegisterModel
+@{
+    ViewData["Title"] = "Food & Gift Sale";
+}
+
+<partial name="_RegisterNav" model="@("shop")" />
+
+@if (Model.LocationName == null)
+{
+    <h1 class="mb-1">Where are you working today?</h1>
+    <p class="text-muted mb-4">Pick your location once. The register remembers it until you change it.</p>
+    <div class="register-locations">
+        @foreach (var l in Model.Locations)
+        {
+            <a href="/Register/Shop?Location=@l.Key" class="register-location">
+                <span class="register-location-name">@l.Name</span>
+                <span class="register-location-kind">@l.Kind</span>
+            </a>
+        }
+    </div>
+}
+else
+{
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-4">
+        <div>
+            <h1 class="mb-1">@Model.LocationName</h1>
+            <p class="text-muted mb-0">@DateTime.Today.ToString("dddd, MMM d")</p>
+        </div>
+        <a href="/Register/Shop?change=true" class="btn btn-outline-primary">Change location</a>
+    </div>
+
+    @if (Model.Done != null)
+    {
+        <div class="alert alert-success d-flex flex-wrap justify-content-between align-items-center gap-2" role="status">
+        <span>@Model.Done</span>
+        @if (Model.ReceiptUrl != null)
+        {
+            <a href="@Model.ReceiptUrl" class="btn btn-sm btn-primary">Print receipt</a>
+        }
+    </div>
+    }
+    @if (Model.ErrorMessage != null)
+    {
+        <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
+    }
+
+    Model.Pos.Start = Model.Qty;
+<partial name="_Pos" model="Model.Pos" />
+}
+
+@section Scripts {
+    <script src="~/js/register.js" asp-append-version="true"></script>
+}

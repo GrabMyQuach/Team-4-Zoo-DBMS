@@ -1,0 +1,55 @@
+@page
+@model ZooDatabase.Pages.Register.MembersModel
+@using ZooDatabase.Data
+@{
+    ViewData["Title"] = "Check a Member";
+}
+
+<partial name="_RegisterNav" model="@("members")" />
+
+<h1 class="mb-1">Check a Member</h1>
+<p class="text-muted mb-4">Search by name, email or phone number.</p>
+
+<form method="get" class="d-flex flex-wrap gap-2 mb-4" role="search">
+    <label for="Q" class="visually-hidden">Name, email or phone</label>
+    <input id="Q" name="Q" value="@Model.Q" class="form-control form-control-lg flex-grow-1" style="max-width: 520px" placeholder="Name, email or phone" autofocus />
+    <button type="submit" class="btn btn-primary btn-lg px-4">Search</button>
+    @if (!string.IsNullOrWhiteSpace(Model.Q))
+    {
+        <a href="/Register/Members" class="btn btn-link btn-lg">Clear</a>
+    }
+</form>
+
+<div class="card">
+    <div class="card-body">
+        <p class="text-muted small mb-3">@Model.Members.Count @(Model.Members.Count == 1 ? "member" : "members")@(string.IsNullOrWhiteSpace(Model.Q) ? "" : $" matching \"{Model.Q}\"")</p>
+        @if (Model.Members.Count == 0)
+        {
+            <p class="mb-0">No membership found. If they say they have one, ask for the email or phone they signed up with.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr><th>Member</th><th>Email</th><th>Phone</th><th>Membership</th><th>Valid until</th><th>Status</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var m in Model.Members)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@m.Name</td>
+                                <td>@(m.Email ?? "—")</td>
+                                <td>@(m.Phone ?? "—")</td>
+                                <td>@m.Tier</td>
+                                <td>@m.End.ToString("MMM d, yyyy")</td>
+                                <td><span class="badge @SalesOptions.MembershipBadge(m.Status)">@m.Status</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+<p class="text-muted small mt-3">Active or Expiring Soon means they can use Member Admission today. Expired members can renew at Guest Services.</p>

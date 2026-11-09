@@ -1,0 +1,73 @@
+@page
+@model ZooDatabase.Pages.Care.FeedingsModel
+@using ZooDatabase.Pages.Care
+@{
+    ViewData["Title"] = "Today's Feedings";
+    var left = Model.Feedings.Count - Model.Logged;
+}
+
+<partial name="_CareNav" model="@("feedings")" />
+
+<h1 class="mb-1">Today's Feedings</h1>
+<p class="text-muted mb-3">@DateTime.Today.ToString("dddd, MMM d") · @Model.Logged of @Model.Feedings.Count logged@(left == 0 && Model.Feedings.Count > 0 ? " · all done!" : "")</p>
+
+@if (Model.Feedings.Count > 0)
+{
+    <div class="care-progress mb-4" role="progressbar" aria-valuemin="0" aria-valuemax="@Model.Feedings.Count" aria-valuenow="@Model.Logged" aria-label="Feedings logged">
+        <div style="width: @(100 * Model.Logged / Model.Feedings.Count)%"></div>
+    </div>
+}
+
+@if (Model.ErrorMessage != null)
+{
+    <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
+}
+
+@if (Model.Feedings.Count == 0)
+{
+    <div class="card"><div class="card-body">
+        <p class="mb-0">No feedings are scheduled for your animals. If that seems wrong, ask a manager to assign you to your animals.</p>
+    </div></div>
+}
+
+<div class="care-list">
+    @foreach (var f in Model.Feedings)
+    {
+        var badge = f.Logged switch { "Completed" => "bg-success", "Partial" => "bg-warning text-dark", _ => "bg-danger" };
+        <div class="care-row @(f.Logged != null ? "is-done" : "")" id="feed-@f.ScheduleId">
+            <div class="care-time">@FeedingsModel.Clock(f.Time)</div>
+            @if (f.Photo != null)
+            {
+                <img src="@f.Photo" alt="" class="animal-thumb care-thumb" loading="lazy" />
+            }
+            else
+            {
+                <span class="animal-thumb animal-thumb--empty care-thumb" aria-hidden="true"></span>
+            }
+            <div class="care-what">
+                <a href="/Animals/Details/@f.AnimalId" class="fw-semibold">@f.Animal</a>
+                <span class="text-muted">@f.Species · @f.Enclosure</span>
+                <span>@f.Quantity.ToString("0.##") @f.Unit @f.Feed</span>
+            </div>
+            @if (f.Logged != null)
+            {
+                <span class="badge @badge care-status">@(f.Logged == "Completed" ? "Ate it" : f.Logged)</span>
+            }
+            else
+            {
+                <form method="post" asp-page-handler="Log" class="care-actions">
+                    <input type="hidden" name="scheduleId" value="@f.ScheduleId" />
+                    <button type="submit" name="status" value="Completed" class="btn btn-primary">Ate it</button>
+                    <span class="care-partial">
+                        <label for="amt-@f.ScheduleId" class="visually-hidden">Amount eaten for a partial feeding, in @f.Unit</label>
+                        <input id="amt-@f.ScheduleId" name="amount" type="number" step="0.01" min="0" class="form-control" placeholder="@f.Unit" />
+                        <button type="submit" name="status" value="Partial" class="btn btn-outline-primary">Partial</button>
+                    </span>
+                    <button type="submit" name="status" value="Refused" class="btn btn-outline-danger">Refused</button>
+                    <button type="submit" name="status" value="Missed" class="btn btn-outline-secondary">Missed</button>
+                </form>
+            }
+        </div>
+    }
+</div>
+<p class="text-muted small mt-3">For a partial feeding, type how much was eaten, then select Partial. Need to add notes or a different date? Open the animal and use Log Feeding.</p>
