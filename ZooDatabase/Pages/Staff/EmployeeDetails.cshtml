@@ -224,7 +224,7 @@
             <div class="card-body pb-0"><h2 class="h5 section-heading">Recent and Upcoming Shifts</h2></div>
             <table class="table table-sm align-middle mb-0">
                 <thead class="table-light">
-                    <tr><th>Date</th><th>Time</th><th class="text-end">Hours</th><th>Status</th></tr>
+                    <tr><th>Date</th><th>Time</th><th class="text-end">Hours</th><th>Status</th>@if (Model.CanMarkAbsent) { <th></th> }</tr>
                 </thead>
                 <tbody>
                     @foreach (var s in Model.Shifts)
@@ -234,11 +234,25 @@
                             <td>@Time(s.Start) - @Time(s.End)</td>
                             <td class="text-end">@s.Hours.ToString("0.#")</td>
                             <td>@s.Status @if (s.Reason != null) { <span class="small text-muted">(@s.Reason)</span> }</td>
+                            @if (Model.CanMarkAbsent)
+                            {
+                                <td class="text-end">
+                                    @if (s.Status == "Scheduled" && s.Date >= DateTime.Today)
+                                    {
+                                        <form method="post" asp-page-handler="Absent" asp-route-id="@Model.Id" class="d-flex gap-1 justify-content-end"
+                                              onsubmit="return confirm('Mark this shift absent? Their open tasks for that day will be handed to a coworker.');">
+                                            <input type="hidden" name="shiftId" value="@s.Id" />
+                                            <input name="reason" class="form-control form-control-sm" style="max-width: 130px;" placeholder="Reason" maxlength="100" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill text-nowrap">Mark Absent</button>
+                                        </form>
+                                    }
+                                </td>
+                            }
                         </tr>
                     }
                     @if (Model.Shifts.Count == 0)
                     {
-                        <tr><td colspan="4" class="text-center text-muted py-3">No shifts in the last 2 weeks.</td></tr>
+                        <tr><td colspan="@(Model.CanMarkAbsent ? 5 : 4)" class="text-center text-muted py-3">No shifts in the last 2 weeks.</td></tr>
                     }
                 </tbody>
             </table>

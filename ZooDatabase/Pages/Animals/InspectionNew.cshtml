@@ -1,0 +1,83 @@
+@page "{id:int}"
+@model ZooDatabase.Pages.Animals.InspectionNewModel
+@using ZooDatabase.Data
+@{
+    ViewData["Title"] = "Record Inspection: " + Model.EnclosureName;
+    string cancelUrl = $"/Animals/EnclosureDetails/{Model.Id}";
+}
+
+<a href="@cancelUrl" class="back-link mt-0 mb-3 d-inline-block">← Back</a>
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-1">Record Inspection: @Model.EnclosureName</h1>
+    <div class="text-muted">Currently @Model.EnclosureStatus.ToLower() · @Model.AnimalCount animal(s) living here</div>
+</div>
+
+<div class="card" style="max-width: 760px;">
+    <div class="card-body p-4">
+
+        @if (Model.ErrorMessage != null)
+        {
+            <div class="alert alert-danger py-2">@Model.ErrorMessage</div>
+        }
+
+        <form method="post">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Result *</label>
+                    <select asp-for="Input.Result" class="form-select">
+                        @foreach (var r in AnimalOptions.InspectionResults)
+                        {
+                            <option value="@r">@r</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Issue found</label>
+                    <select asp-for="Input.IssueCategory" class="form-select">
+                        @foreach (var c in AnimalOptions.IssueCategories)
+                        {
+                            <option value="@c">@(c == "None" ? "None (passed)" : c)</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Date and time *</label>
+                    <input asp-for="Input.InspectionDate" type="datetime-local" class="form-control" />
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Inspector</label>
+                    <select asp-for="Input.InspectorId" class="form-select">
+                        <option value="0">Not recorded</option>
+                        @foreach (var i in Model.Inspectors)
+                        {
+                            <option value="@i.Id">@i.Label</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Findings</label>
+                    <textarea asp-for="Input.Findings" class="form-control" rows="3" maxlength="500"
+                              placeholder="e.g. Section of perimeter fence is bent near the gate"></textarea>
+                </div>
+
+                <div class="col-12">
+                    <div class="form-text p-3 border rounded bg-light">
+                        <strong>Critical</strong> closes the enclosure, creates an emergency repair request, and gives
+                        each animal's keeper a task to move it out.
+                        <strong>Pass</strong> on a closed enclosure reopens it once its emergency repairs are completed.
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-primary rounded-pill px-4">Save Inspection</button>
+                <a href="@cancelUrl" class="btn btn-outline-secondary rounded-pill px-4">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>

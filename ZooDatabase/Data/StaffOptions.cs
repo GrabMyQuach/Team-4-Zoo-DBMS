@@ -16,6 +16,12 @@ public static class StaffOptions
     public static bool CanEditMaintenance(ClaimsPrincipal user) =>
         MaintenanceEditorRoles.Split(',').Any(user.IsInRole);
 
+    // Roles allowed to mark someone absent for a shift (Employee page > Shifts)
+    public const string AttendanceRoles = "DBA,SuperUser,Admin";
+
+    public static bool CanMarkAbsent(ClaimsPrincipal user) =>
+        AttendanceRoles.Split(',').Any(user.IsInRole);
+
     // These must match the database: the Priority ENUM and the chk_maintenance_status rule
     public static readonly string[] MaintenancePriorities = { "Low", "Normal", "High", "Emergency" };
     public static readonly string[] MaintenanceStatuses = { "Open", "Pending", "In Progress", "Completed", "Cancelled" };

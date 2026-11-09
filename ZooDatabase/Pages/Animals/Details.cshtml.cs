@@ -87,7 +87,7 @@ public class DetailsModel : PageModel
 
         // 2. Is it in quarantine right now?
         await using (var cmd = new MySqlCommand(@"
-            SELECT Start_Date, Expected_End_Date, Reason, Status
+            SELECT Start_Date, Expected_End_Date, Reason, Status, Quarantine_ID
             FROM Quarantine
             WHERE Animal_ID = @id AND Status IN ('Active', 'Extended')
             ORDER BY Start_Date DESC LIMIT 1", conn))
@@ -101,7 +101,8 @@ public class DetailsModel : PageModel
                     StartDate = r.GetDateTime(0),
                     ExpectedEnd = Date(r, 1),
                     Reason = Str(r, 2),
-                    Status = r.GetString(3)
+                    Status = r.GetString(3),
+                    Id = r.GetInt32(4)
                 };
             }
         }
@@ -130,11 +131,11 @@ public class DetailsModel : PageModel
         // 4. Health history: the 10 most recent vet records
         await using (var cmd = new MySqlCommand(@"
             SELECT h.Exam_Date, h.Record_Type, h.Diagnosis, h.Severity, h.Is_Contagious,
-                   h.Treatment, h.Weight_kg, CONCAT(e.First_Name, ' ', e.Last_Name)
+                   h.Treatment, h.Weight_kg, CONCAT(e.First_Name, ' ', e.Last_Name), h.Health_Record_ID
             FROM Health_Record h
             LEFT JOIN Employee e ON e.Employee_ID = h.Vet_Employee_ID
             WHERE h.Animal_ID = @id
-            ORDER BY h.Exam_Date DESC
+            ORDER BY h.Exam_Date DESC, h.Health_Record_ID DESC
             LIMIT 10", conn))
         {
             cmd.Parameters.AddWithValue("@id", id);
@@ -150,7 +151,8 @@ public class DetailsModel : PageModel
                     IsContagious = r.GetBoolean(4),
                     Treatment = Str(r, 5),
                     WeightKg = r.IsDBNull(6) ? null : r.GetDecimal(6),
-                    Vet = Str(r, 7)
+                    Vet = Str(r, 7),
+                    Id = r.GetInt32(8)
                 });
             }
         }
@@ -282,6 +284,137 @@ public class DetailsModel : PageModel
         return RedirectToPage("/Animals/Animals");
     }
 
+    // "Release from quarantine" button (vets). Setting Status = 'Released' fires trg_quarantine_released,
+    // which sets the end date, marks the animal Recovered, returns it to public encounters,
+    // cancels leftover quarantine tasks and tells the keepers.
+    public async Task<IActionResult> OnPostReleaseQuarantineAsync(int id, int quarantineId)
+    {
+        if (!CanRecordHealth) return Forbid();
+
+        await using var conn = new MySqlConnection(_config.GetConnectionString("ZooDb"));
+        await conn.OpenAsync();
+
+        await using (var cmd = new MySqlCommand(@"
+            UPDATE Quarantine SET Status = 'Released'
+            WHERE Quarantine_ID = @q AND Animal_ID = @id AND Status IN ('Active', 'Extended')", conn))
+        {
+            cmd.Parameters.AddWithValue("@q", quarantineId);
+            cmd.Parameters.AddWithValue("@id", id);
+            if (await cmd.ExecuteNonQueryAsync() == 0)
+            {
+                TempData["Success"] = "That quarantine was already released.";
+                return Redirect($"/Animals/Details/{id}");
+            }
+        }
+
+        // Read back what the trigger did
+        await using (var cmd = new MySqlCommand(@"
+            SELECT a.Animal_Name, a.Health_Status, a.Public_Encounter_Eligible,
+                   (SELECT COUNT(*) FROM Quarantine q2 WHERE q2.Animal_ID = a.Animal_ID AND q2.Status IN ('Active', 'Extended'))
+            FROM Animal a WHERE a.Animal_ID = @id", conn))
+        {
+            cmd.Parameters.AddWithValue("@id", id);
+            await using var r = await cmd.ExecuteReaderAsync();
+            await r.ReadAsync();
+            string name = r.GetString(0);
+            TempData["Success"] = Convert.ToInt32(r.GetValue(3)) > 0
+                ? $"Quarantine released. {name} still has another active quarantine, so it stays off public encounters."
+                : $"{name} was released from quarantine. Health status is now {r.GetString(1)}"
+                  + (r.GetBoolean(2) ? " and it is cleared for public encounters again." : ".")
+                  + " Its keepers were notified.";
+        }
+        return Redirect($"/Animals/Details/{id}");
+    }
+
+    // "Delete" button on a health record (for exams entered by mistake).
+    // A contagious record already fired trg_contagious_diagnosis, so this also undoes what that trigger
+    // started: the quarantine it opened, the follow-up and exposure-screening tasks, and the
+    // Quarantined status. Encounters it cancelled stay cancelled (they may have been rebooked).
+    public async Task<IActionResult> OnPostDeleteHealthAsync(int id, int recordId)
+    {
+        if (!CanRecordHealth) return Forbid();
+
+        await using var conn = new MySqlConnection(_config.GetConnectionString("ZooDb"));
+        await conn.OpenAsync();
+        await using var tx = await conn.BeginTransactionAsync();
+
+        async Task<int> Run(string sql)
+        {
+            await using var cmd = new MySqlCommand(sql, conn, tx);
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.Parameters.AddWithValue("@rec", recordId);
+            return await cmd.ExecuteNonQueryAsync();
+        }
+
+        // Make sure the record belongs to this animal
+        await using (var cmd = new MySqlCommand(
+            "SELECT COUNT(*) FROM Health_Record WHERE Health_Record_ID = @rec AND Animal_ID = @id", conn, tx))
+        {
+            cmd.Parameters.AddWithValue("@rec", recordId);
+            cmd.Parameters.AddWithValue("@id", id);
+            if (Convert.ToInt32(await cmd.ExecuteScalarAsync()) == 0)
+            {
+                TempData["Success"] = "That health record was already deleted.";
+                return Redirect($"/Animals/Details/{id}");
+            }
+        }
+
+        // Cancel the tasks the record created (on this animal and its enclosure-mates)
+        int tasks = await Run(@"
+            UPDATE Care_Task SET Status = 'Cancelled', Completed_At = NOW()
+            WHERE Source_Type = 'Health_Record' AND Source_ID = @rec AND Status IN ('Open', 'In Progress')");
+
+        // Remove the open quarantine this record started. Released ones are kept as history
+        // (their Health_Record_ID becomes NULL through the foreign key).
+        int quarantines = await Run(@"
+            DELETE FROM Quarantine
+            WHERE Health_Record_ID = @rec AND Animal_ID = @id AND Status IN ('Active', 'Extended')");
+
+        await Run("DELETE FROM Health_Record WHERE Health_Record_ID = @rec AND Animal_ID = @id");
+
+        // If nothing else keeps the animal in quarantine, put it back to normal
+        bool lifted;
+        string name;
+        int? enclosure;
+        await using (var cmd = new MySqlCommand(@"
+            SELECT a.Animal_Name, a.Enclosure_ID,
+                   (SELECT COUNT(*) FROM Quarantine q WHERE q.Animal_ID = a.Animal_ID AND q.Status IN ('Active', 'Extended'))
+            FROM Animal a WHERE a.Animal_ID = @id", conn, tx))
+        {
+            cmd.Parameters.AddWithValue("@id", id);
+            await using var r = await cmd.ExecuteReaderAsync();
+            await r.ReadAsync();
+            name = r.GetString(0);
+            enclosure = r.IsDBNull(1) ? null : r.GetInt32(1);
+            lifted = quarantines > 0 && Convert.ToInt32(r.GetValue(2)) == 0;
+        }
+        if (lifted)
+        {
+            await Run(@"
+                UPDATE Animal SET Public_Encounter_Eligible = 1,
+                       Health_Status = IF(Health_Status = 'Quarantined', 'Healthy', Health_Status)
+                WHERE Animal_ID = @id");
+            if (enclosure != null)
+            {
+                await using var cmd = new MySqlCommand("CALL sp_notify_enclosure_keepers(@enc, @id, 'Info', @msg)", conn, tx);
+                cmd.Parameters.AddWithValue("@enc", enclosure);
+                cmd.Parameters.AddWithValue("@id", id);
+                cmd.Parameters.AddWithValue("@msg",
+                    $"The quarantine for {name} was entered by mistake and has been removed. Normal care can resume.");
+                await cmd.ExecuteNonQueryAsync();
+            }
+        }
+
+        await tx.CommitAsync();
+
+        string msg = "Health record deleted.";
+        if (lifted) msg += $" The quarantine it started was removed and {name} is back on public encounters; its keepers were notified.";
+        else if (quarantines > 0) msg += $" Its quarantine was removed, but {name} still has another active quarantine.";
+        if (tasks > 0) msg += $" {tasks} care task{(tasks == 1 ? "" : "s")} it created {(tasks == 1 ? "was" : "were")} cancelled.";
+        TempData["Success"] = msg;
+        return Redirect($"/Animals/Details/{id}");
+    }
+
     // Small helpers: return null when the database cell is empty
     private static string? Str(DbDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
     private static DateTime? Date(DbDataReader r, int i) => r.IsDBNull(i) ? null : r.GetDateTime(i);
@@ -332,6 +465,7 @@ public class DetailsModel : PageModel
 
     public class QuarantineInfo
     {
+        public int Id { get; set; }
         public DateTime StartDate { get; set; }
         public DateTime? ExpectedEnd { get; set; }
         public string? Reason { get; set; }
@@ -347,6 +481,7 @@ public class DetailsModel : PageModel
 
     public class HealthEntry
     {
+        public int Id { get; set; }
         public DateTime ExamDate { get; set; }
         public string RecordType { get; set; } = "";
         public string? Diagnosis { get; set; }

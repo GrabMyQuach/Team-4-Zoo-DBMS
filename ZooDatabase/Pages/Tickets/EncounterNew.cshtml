@@ -1,0 +1,85 @@
+@page
+@model ZooDatabase.Pages.Tickets.EncounterNewModel
+@{
+    ViewData["Title"] = "Book Animal Encounter";
+}
+
+<a href="/Tickets/Attractions" class="back-link mt-0 mb-3 d-inline-block">← Back</a>
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">Book Animal Encounter</h1>
+</div>
+
+<div class="card" style="max-width: 760px;">
+    <div class="card-body p-4">
+
+        @if (Model.ErrorMessage != null)
+        {
+            <div class="alert alert-danger py-2">@Model.ErrorMessage</div>
+        }
+
+        <form method="post">
+            <div class="row g-3">
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Animal *</label>
+                    <select asp-for="Input.AnimalId" class="form-select">
+                        <option value="0">Choose an animal…</option>
+                        @foreach (var a in Model.Animals)
+                        {
+                            <option value="@a.Id">@a.Name (@a.Species)@(a.Reason != null ? " · not available: " + a.Reason : "")</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Attraction</label>
+                    <select asp-for="Input.AttractionId" class="form-select">
+                        <option value="0">None</option>
+                        @foreach (var a in Model.Attractions)
+                        {
+                            <option value="@a.Id">@a.Label</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Handler</label>
+                    <select asp-for="Input.HandlerId" class="form-select">
+                        <option value="0">Not assigned yet</option>
+                        @foreach (var h in Model.Handlers)
+                        {
+                            <option value="@h.Id">@h.Label</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Starts *</label>
+                    <input asp-for="Input.ScheduledStart" type="datetime-local" class="form-control" />
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Minutes *</label>
+                    <input asp-for="Input.DurationMinutes" type="number" min="5" max="240" class="form-control" />
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Max guests</label>
+                    <input asp-for="Input.MaxGuests" type="number" min="1" class="form-control" />
+                </div>
+
+                <div class="col-12">
+                    <div class="form-text p-3 border rounded bg-light">
+                        The database refuses encounters with animals that are in quarantine, suspended by a vet,
+                        or waiting to be moved out of an unsafe enclosure.
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-primary rounded-pill px-4">Book Encounter</button>
+                <a href="/Tickets/Attractions" class="btn btn-outline-secondary rounded-pill px-4">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>

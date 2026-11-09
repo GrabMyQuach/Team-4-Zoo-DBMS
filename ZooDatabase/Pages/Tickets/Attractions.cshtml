@@ -16,10 +16,16 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h2 class="h5 mb-0">@Model.Rows.Count attractions · @Model.Rows.Count(r => r.Status == "Open") open</h2>
-    @if (Model.CanManage)
-    {
-        <a href="/Tickets/AttractionEdit" class="btn btn-primary rounded-pill px-4">+ Add Attraction</a>
-    }
+    <div class="d-flex gap-2">
+        @if (Model.CanBookEncounter)
+        {
+            <a href="/Tickets/EncounterNew" class="btn btn-outline-primary rounded-pill px-4">Book Encounter</a>
+        }
+        @if (Model.CanManage)
+        {
+            <a href="/Tickets/AttractionEdit" class="btn btn-primary rounded-pill px-4">+ Add Attraction</a>
+        }
+    </div>
 </div>
 
 <div class="card">

@@ -30,6 +30,24 @@ public static class AnimalOptions
     // Must match the Status ENUM on Feeding_Log in the database
     public static readonly string[] FeedingStatuses = { "Completed", "Partial", "Refused", "Missed" };
 
+    // Roles allowed to record habitat inspections (Enclosure page > Record Inspection)
+    public const string InspectionRoles = "Zookeeper,Admin,SuperUser,DBA";
+
+    public static bool CanInspect(ClaimsPrincipal user) =>
+        InspectionRoles.Split(',').Any(user.IsInRole);
+
+    // Must match the Result and Issue_Category ENUMs on Habitat_Inspection
+    public static readonly string[] InspectionResults = { "Pass", "Minor Issues", "Critical" };
+    public static readonly string[] IssueCategories =
+        { "None", "Structural", "Barrier/Fencing", "Water Quality", "Temperature/Climate",
+          "Electrical", "Sanitation", "Vegetation/Hazard", "Other" };
+
+    // Roles allowed to approve and receive feed restock orders (Animals > Feed)
+    public const string FeedOrderRoles = "Admin,SuperUser,DBA";
+
+    public static bool CanManageFeedOrders(ClaimsPrincipal user) =>
+        FeedOrderRoles.Split(',').Any(user.IsInRole);
+
     // Dropdown choices, so staff pick from a list instead of typing
     public static readonly string[] Genders = { "Male", "Female", "Unknown" };
 

@@ -11,6 +11,11 @@ public static class SalesOptions
     // Who can change prices, ticket types, attractions, shops, products, suppliers
     public const string ManagerRoles = "DBA";
 
+    // Who can book animal encounters (Tickets > Attractions > Book Encounter)
+    public const string EncounterRoles = "DBA,SuperUser,Admin";
+
+    public static bool CanBookEncounter(ClaimsPrincipal user) => EncounterRoles.Split(',').Any(user.IsInRole);
+
     public static bool CanSell(ClaimsPrincipal user) => SalesRoles.Split(',').Any(user.IsInRole);
     public static bool CanManage(ClaimsPrincipal user) => user.IsInRole("DBA");
 

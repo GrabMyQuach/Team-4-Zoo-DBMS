@@ -205,7 +205,13 @@
     <div class="col-12">
         <div class="card">
             <div class="card-body p-4">
-                <h2 class="h5 section-heading">Recent Inspections</h2>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="h5 section-heading mb-0">Recent Inspections</h2>
+                    @if (Model.CanInspect)
+                    {
+                        <a href="/Animals/InspectionNew/@e.Id" class="btn btn-primary btn-sm rounded-pill px-3">Record Inspection</a>
+                    }
+                </div>
                 @if (Model.Inspections.Count == 0)
                 {
                     <p class="text-muted mb-0">No inspections recorded.</p>

@@ -59,6 +59,14 @@
         {
             <div class="small mt-1">Reason: @q.Reason</div>
         }
+        @if (Model.CanRecordHealth)
+        {
+            <form method="post" asp-page-handler="ReleaseQuarantine" asp-route-id="@a.AnimalId" class="mt-2"
+                  onsubmit="return confirm('Release this animal from quarantine? It will go back on public encounters.');">
+                <input type="hidden" name="quarantineId" value="@q.Id" />
+                <button type="submit" class="btn btn-sm btn-light rounded-pill px-3">Release from Quarantine</button>
+            </form>
+        }
     </div>
 }
 @if (a.NeedsRelocation)
@@ -343,6 +351,10 @@
                                     <th>Treatment</th>
                                     <th>Weight</th>
                                     <th>Vet</th>
+                                    @if (Model.CanRecordHealth)
+                                    {
+                                        <th></th>
+                                    }
                                 </tr>
                             </thead>
                             <tbody>
@@ -362,6 +374,16 @@
                                         <td>@(h.Treatment ?? "—")</td>
                                         <td>@(h.WeightKg != null ? h.WeightKg.Value.ToString("0.#") + " kg" : "—")</td>
                                         <td>@(h.Vet ?? "—")</td>
+                                        @if (Model.CanRecordHealth)
+                                        {
+                                            <td class="text-end">
+                                                <form method="post" asp-page-handler="DeleteHealth" asp-route-id="@Model.Animal.AnimalId" class="d-inline"
+                                                      onsubmit="return confirm('@(h.IsContagious ? "Delete this record? The quarantine and care tasks it started will be removed too." : "Delete this health record? This cannot be undone.")');">
+                                                    <input type="hidden" name="recordId" value="@h.Id" />
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3">Delete</button>
+                                                </form>
+                                            </td>
+                                        }
                                     </tr>
                                 }
                             </tbody>
