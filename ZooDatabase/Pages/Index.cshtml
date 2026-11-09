@@ -15,7 +15,7 @@
     @foreach (var m in ZooModules.All)
     {
         // Restrict modules based on the logged-in user's role
-        if (User.IsInRole("ReadOnly") &&
+        if (User.IsInRole("Customer") &&
             (m.Key == "Staff" || m.Key == "Finance"))
         {
             continue;

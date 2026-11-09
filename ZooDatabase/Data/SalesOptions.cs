@@ -16,7 +16,7 @@ public static class SalesOptions
 
     // Read-only visitors never see customer emails or phone numbers
     public static bool CanSeeContact(ClaimsPrincipal user) =>
-        user.Identity?.IsAuthenticated == true && !user.IsInRole("ReadOnly");
+        user.Identity?.IsAuthenticated == true && !user.IsInRole("Customer");
 
     public static readonly string[] PaymentMethods = { "Credit Card", "Debit Card", "Cash", "Mobile Pay" };
     public static readonly string[] AttractionStatuses = { "Open", "Closed", "Under Maintenance", "Seasonal" };
