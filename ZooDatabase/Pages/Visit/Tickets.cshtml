@@ -1,0 +1,60 @@
+@page "/visit/tickets"
+@model ZooDatabase.Pages.Visit.TicketsModel
+@using ZooDatabase.Data
+@{
+    ViewData["Title"] = "Buy Tickets";
+}
+
+<section class="page-banner">
+    <div class="pub-wrap">
+        <h1>Buy Tickets</h1>
+    </div>
+</section>
+
+<section class="pub-section">
+    <div class="pub-wrap buy-layout">
+        <partial name="_ShopNav" model="@("tickets")" />
+
+        <div class="buy-main">
+            <h2 class="buy-title">General Admission</h2>
+            @if (Model.ErrorMessage != null)
+            {
+                <div class="pub-alert" role="alert">@Model.ErrorMessage</div>
+            }
+
+            <form method="post" asp-page-handler="Add" class="buy-box">
+                @foreach (var t in Model.Tickets)
+                {
+                    var qty = Model.Quantities.GetValueOrDefault(t.Id);
+                    <div class="ticket-row">
+                        <div class="ticket-name">
+                            <span>@t.Name</span>
+                            @if (!string.IsNullOrWhiteSpace(t.Note)) { <small>@t.Note</small> }
+                        </div>
+                        <div class="ticket-price">@t.Price.ToString("C")</div>
+                        <div class="stepper">
+                            <button type="button" data-step="-1" data-target="qty-@t.Id" aria-label="One less @t.Name">−</button>
+                            <input id="qty-@t.Id" name="Quantities[@t.Id]" type="number" min="0" max="@Cart.MaxPerLine" value="@qty" aria-label="Number of @t.Name tickets" />
+                            <button type="button" data-step="1" data-target="qty-@t.Id" aria-label="One more @t.Name">+</button>
+                        </div>
+                    </div>
+                }
+
+                <div class="when-row">
+                    <span class="when-label" id="when-label">When?</span>
+                    <input type="hidden" id="VisitDate" name="VisitDate" value="@Model.VisitDate" />
+                    <span class="when-picked" id="when-picked">@(DateTime.TryParse(Model.VisitDate, out var d) ? d.ToString("ddd, MMM d, yyyy") : "Pick a day below")</span>
+                </div>
+
+                <div class="calendar" data-calendar data-input="VisitDate" data-label="when-picked"
+                     data-min="@DateTime.Today.ToString("yyyy-MM-dd")" data-max="@DateTime.Today.AddYears(1).ToString("yyyy-MM-dd")"
+                     aria-labelledby="when-label"></div>
+                <div class="buy-continue">
+                    <button type="submit" class="pub-btn pub-btn--green">Continue</button>
+                </div>
+            </form>
+
+            <p class="pub-note">Open every day @PublicSite.Hours · last entry at @PublicSite.LastEntry. Members get in free with their membership card.</p>
+        </div>
+    </div>
+</section>

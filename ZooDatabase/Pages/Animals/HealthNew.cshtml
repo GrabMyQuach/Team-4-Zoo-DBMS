@@ -1,0 +1,102 @@
+@page "{id:int}"
+@model ZooDatabase.Pages.Animals.HealthNewModel
+@using ZooDatabase.Data
+@{
+    ViewData["Title"] = "Record Exam: " + Model.AnimalName;
+    string cancelUrl = $"/Animals/Details/{Model.Id}";
+}
+
+<a href="@cancelUrl" class="back-link mt-0 mb-3 d-inline-block">← Back</a>
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">Record Exam: @Model.AnimalName</h1>
+</div>
+
+<div class="card" style="max-width: 760px;">
+    <div class="card-body p-4">
+
+        @if (Model.ErrorMessage != null)
+        {
+            <div class="alert alert-danger py-2">@Model.ErrorMessage</div>
+        }
+
+        <form method="post">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Exam date and time *</label>
+                    <input asp-for="Input.ExamDate" type="datetime-local" class="form-control" />
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Vet</label>
+                    <select asp-for="Input.VetId" class="form-select">
+                        <option value="0">Not recorded</option>
+                        @foreach (var v in Model.VetOptions)
+                        {
+                            <option value="@v.Id">@v.Label</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Record type *</label>
+                    <select asp-for="Input.RecordType" class="form-select">
+                        @foreach (var t in AnimalOptions.RecordTypes)
+                        {
+                            <option value="@t">@t</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Severity *</label>
+                    <select asp-for="Input.Severity" class="form-select">
+                        @foreach (var s in AnimalOptions.Severities)
+                        {
+                            <option value="@s">@s</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Diagnosis</label>
+                    <input asp-for="Input.Diagnosis" class="form-control" maxlength="255"
+                           placeholder="e.g. Annual wellness exam - no significant findings" />
+                </div>
+
+                <div class="col-12">
+                    <div class="form-check p-3 border rounded bg-light">
+                        <input asp-for="Input.IsContagious" class="form-check-input ms-0 me-2" type="checkbox" />
+                        <label asp-for="Input.IsContagious" class="form-check-label fw-semibold">Contagious</label>
+                        <div class="form-text ms-4">
+                            Saving a contagious exam starts a 14-day quarantine, cancels this animal's upcoming
+                            encounters, creates follow-up and exposure-check tasks, and alerts the keepers.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Treatment</label>
+                    <input asp-for="Input.Treatment" class="form-control" maxlength="255" />
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Weight (kg)</label>
+                    <input asp-for="Input.WeightKg" type="number" step="0.01" min="0" class="form-control" />
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Notes</label>
+                    <textarea asp-for="Input.Notes" class="form-control" rows="3"></textarea>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-primary rounded-pill px-4">Save Exam</button>
+                <a href="@cancelUrl" class="btn btn-outline-secondary rounded-pill px-4">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@{ Layout = "_ModuleLayout"; }

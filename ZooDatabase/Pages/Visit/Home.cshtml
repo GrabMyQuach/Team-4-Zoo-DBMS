@@ -1,0 +1,126 @@
+@page "/"
+@model ZooDatabase.Pages.Visit.HomeModel
+@using ZooDatabase.Data
+@{
+    ViewData["Title"] = "Home";
+    ViewData["Hero"] = true;
+}
+
+<section class="hero" data-carousel data-interval="6000" aria-roledescription="carousel" aria-label="Highlights">
+    @for (int i = 0; i < Model.Slides.Count; i++)
+    {
+        var s = Model.Slides[i];
+        var bg = s.Photo != null ? $"background-color:{s.Tint};background-image:url('{s.Photo}')" : $"background-color:{s.Tint}";
+        <div class="hero-slide @(i == 0 ? "is-active" : "")" style="@bg" aria-roledescription="slide" aria-label="@(i + 1) of @Model.Slides.Count" aria-hidden="@(i == 0 ? "false" : "true")">
+            <div class="pub-wrap hero-content">
+                @if (i == 0)
+                {
+                    <h1>@s.Title</h1>
+                }
+                else
+                {
+                    <h2 class="hero-title">@s.Title</h2>
+                }
+                <div class="hero-rule"></div>
+                <p>@s.Body</p>
+                <a class="pub-btn pub-btn--accent" href="@s.Href" tabindex="@(i == 0 ? "0" : "-1")">@s.Cta →</a>
+            </div>
+        </div>
+    }
+    <button type="button" class="hero-arrow hero-prev" aria-label="Previous slide">&#8249;</button>
+    <button type="button" class="hero-arrow hero-next" aria-label="Next slide">&#8250;</button>
+    <div class="hero-dots">
+        @for (int i = 0; i < Model.Slides.Count; i++)
+        {
+            <button type="button" class="hero-dot @(i == 0 ? "is-active" : "")" aria-label="Go to slide @(i + 1)"></button>
+        }
+    </div>
+</section>
+
+<nav class="quickbar" aria-label="Quick links">
+    <a href="/visit/tickets"><span>Today's Hours</span><small>@PublicSite.Hours</small></a>
+    <a href="/visit/tickets"><span>Buy Tickets</span><small>→</small></a>
+    <a href="/visit/animals"><span>Animals</span><small>→</small></a>
+    <a href="/visit/shop"><span>Shop Online</span><small>→</small></a>
+    <a href="/visit/membership"><span>Membership</span><small>→</small></a>
+</nav>
+
+<section class="pub-section pub-section--sand">
+    <div class="pub-wrap">
+        <div class="pub-section-head">
+            <div>
+                <div class="pub-eyebrow">Meet the animals</div>
+                <h2>Say hello to our residents</h2>
+            </div>
+            <a class="pub-link" href="/visit/animals">See all @Model.AnimalCount animals →</a>
+        </div>
+        <div class="pub-grid">
+            @foreach (var a in Model.Featured)
+            {
+                <partial name="_AnimalCard" model="a" />
+            }
+        </div>
+    </div>
+</section>
+
+<section class="pub-section">
+    <div class="pub-wrap">
+        <div class="pub-section-head">
+            <div>
+                <div class="pub-eyebrow">Plan your visit</div>
+                <h2>Tickets</h2>
+            </div>
+            <a class="pub-btn pub-btn--accent" href="/visit/tickets">Buy tickets</a>
+        </div>
+        <div class="pub-grid">
+            @foreach (var t in Model.Tickets)
+            {
+                <div class="price-card">
+                    <h3>@t.Name</h3>
+                    @if (!string.IsNullOrWhiteSpace(t.Note)) { <p>@t.Note</p> }
+                    <div class="price">@t.Price.ToString("C")</div>
+                </div>
+            }
+        </div>
+    </div>
+</section>
+
+<section class="pub-section pub-section--tight">
+    <div class="pub-wrap">
+        <div class="member-banner" style="@(Model.MemberPhoto != null ? $"background-image:url('{Model.MemberPhoto}')" : "")">
+            <div class="member-banner-text">
+                <h2>Become a Member</h2>
+                <p>A full year of unlimited visits, plus member perks around the park.</p>
+            </div>
+            <a class="pub-btn pub-btn--white" href="/visit/membership">See membership levels</a>
+        </div>
+        <div class="tier-strip">
+            @foreach (var m in Model.Memberships)
+            {
+                <div class="tier">
+                    <h3>@m.Name</h3>
+                    <div class="tier-price">@m.Price.ToString("C") / year</div>
+                </div>
+            }
+        </div>
+    </div>
+</section>
+
+<section class="pub-section pub-section--sand" id="food-shops">
+    <div class="pub-wrap pub-grid">
+        <div class="info-card">
+            <h3>Hours</h3>
+            <p>Open every day @PublicSite.Hours. Last entry at @PublicSite.LastEntry.</p>
+            <a class="pub-link" href="/visit/tickets">Plan your trip →</a>
+        </div>
+        <div class="info-card">
+            <h3>Food &amp; drinks</h3>
+            <p>@Model.FoodStands food stands across the park, from quick snacks to full meals.</p>
+        </div>
+        <div class="info-card">
+            <h3>Gift shops</h3>
+            <p>@Model.GiftShops gift shops with plush animals, apparel and souvenirs.</p>
+            <a class="pub-link" href="/visit/shop">Shop favorites online →</a>
+        </div>
+    </div>
+</section>

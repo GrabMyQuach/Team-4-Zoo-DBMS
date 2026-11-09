@@ -1,3 +1,4 @@
 @page "{id:int?}"
 @model ZooDatabase.Pages.Shop.FoodStandEditModel
+@{ ViewData["Title"] = Model.IsNew ? "Add " + Model.Kind.Label : "Edit " + Model.Name; }
 <partial name="_OutletEdit" model="Model" />

@@ -1,0 +1,99 @@
+@page "{id:int}"
+@model ZooDatabase.Pages.Animals.FeedingNewModel
+@using ZooDatabase.Data
+@{
+    ViewData["Title"] = "Log Feeding: " + Model.AnimalName;
+    string cancelUrl = $"/Animals/Details/{Model.Id}";
+}
+
+<a href="@cancelUrl" class="back-link mt-0 mb-3 d-inline-block">← Back</a>
+
+<div class="border-bottom pb-3 mb-4">
+    <h1 class="h2 mb-0">Log Feeding: @Model.AnimalName</h1>
+</div>
+
+<div class="card" style="max-width: 760px;">
+    <div class="card-body p-4">
+
+        @if (Model.ErrorMessage != null)
+        {
+            <div class="alert alert-danger py-2">@Model.ErrorMessage</div>
+        }
+
+        @if (Model.Schedules.Count == 0)
+        {
+            <p class="text-muted mb-0">@Model.AnimalName has no active feeding schedule, so there is nothing to log.</p>
+        }
+        else
+        {
+            <form method="post">
+                <div class="row g-3">
+                    <div class="col-md-8">
+                        <label class="form-label fw-semibold">Which feeding *</label>
+                        <select asp-for="Input.ScheduleId" class="form-select">
+                            @foreach (var s in Model.Schedules)
+                            {
+                                <option value="@s.Id">
+                                    @s.Label (@s.Quantity.ToString("0.##") @s.Unit)@(s.LoggedToday ? " · already logged today" : "")
+                                </option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Date *</label>
+                        <input asp-for="Input.FeedingDate" type="date" class="form-control" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">What happened *</label>
+                        <select asp-for="Input.Status" class="form-select">
+                            @foreach (var s in AnimalOptions.FeedingStatuses)
+                            {
+                                <option value="@s">@s</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Amount given</label>
+                        <input asp-for="Input.QuantityGiven" type="number" step="0.01" min="0" class="form-control" />
+                        <div class="form-text">Leave as scheduled for a full feeding. Ignored if missed or refused.</div>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Recorded by</label>
+                        <select asp-for="Input.RecordedBy" class="form-select">
+                            <option value="0">Not recorded</option>
+                            @foreach (var k in Model.Keepers)
+                            {
+                                <option value="@k.Id">@k.Label</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Notes</label>
+                        <input asp-for="Input.Notes" class="form-control" maxlength="255"
+                               placeholder="e.g. Ate slowly, some left over" />
+                    </div>
+
+                    <div class="col-12">
+                        <div class="form-text p-3 border rounded bg-light">
+                            <strong>Completed</strong> or <strong>Partial</strong> takes the amount out of feed stock and
+                            drafts a restock order if stock runs low. <strong>Missed</strong> creates an urgent make-up
+                            feeding task. Two missed or refused feedings in 3 days add a vet welfare check.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 mt-4">
+                    <button type="submit" class="btn btn-primary rounded-pill px-4">Save Feeding</button>
+                    <a href="@cancelUrl" class="btn btn-outline-secondary rounded-pill px-4">Cancel</a>
+                </div>
+            </form>
+        }
+    </div>
+</div>
+
+@{ Layout = "_ModuleLayout"; }

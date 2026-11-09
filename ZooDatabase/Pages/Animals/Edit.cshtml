@@ -84,6 +84,24 @@
                     <input asp-for="Input.DateAcquired" type="date" class="form-control" />
                 </div>
 
+                @if (Model.IsNew && Model.BreedingOptions.Count > 0)
+                {
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Born here from a breeding event?</label>
+                        <select asp-for="Input.BreedingId" class="form-select">
+                            <option value="0">No</option>
+                            @foreach (var b in Model.BreedingOptions)
+                            {
+                                <option value="@b.Id">@b.Label</option>
+                            }
+                        </select>
+                        <div class="form-text">
+                            Choosing one fills in the parents, enrolls the newborn in its conservation program,
+                            and creates a neonatal vet exam and studbook task.
+                        </div>
+                    </div>
+                }
+
                 <div class="col-md-6">
                     <label class="form-label fw-semibold">How acquired</label>
                     <select asp-for="Input.AcquisitionType" class="form-select">

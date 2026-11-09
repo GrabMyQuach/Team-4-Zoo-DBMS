@@ -2,328 +2,394 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MySqlConnector;
 using ZooDatabase.Data;
+using static ZooDatabase.Pages.Reports.LaborMath;
 
 namespace ZooDatabase.Pages.Reports;
 
 // STAFFING & LABOR REPORT
-// Question: "Is staff time being used efficiently, what does labor cost, and do departments have enough coverage?"
+// Question: "Is staff time being used well, what does labor cost, and do departments have enough coverage?"
 // Uses Employee_Shift, Employee, Department, Care_Task.
+// Hours are PAID hours (shifts of 6+ hours have a 30-minute unpaid break). Every count links to the shifts behind it.
 [Authorize(Roles = ReportAccess.Staffing)]
-public class StaffingModel : ReportPageModel
+public class StaffingModel : RunnableReport
 {
     public StaffingModel(IConfiguration config) : base(config) { }
 
-    // Salaried pay is stored per year; turn it into an hourly rate (52 weeks x 40 hours)
-    private const string HourlyRate =
-        "CASE WHEN e.Pay_Type = 'Salary' AND e.Pay_Rate > 500 THEN e.Pay_Rate / 2080 ELSE COALESCE(e.Pay_Rate, 0) END";
+    public override string ReportTitle => "Staffing & Labor";
+
+    public override IReadOnlyList<ReportView> Views { get; } = new[]
+    {
+        new ReportView("department", "By department", "staff, paid hours, absences and labor cost for each department."),
+        new ReportView("employee", "By employee", "who worked the most, who missed shifts, and overtime."),
+        new ReportView("weekly", "Week by week", "paid hours, absences and labor cost each week."),
+        new ReportView("overtime", "Overtime", "every employee-week over 40 paid hours."),
+        new ReportView("absences", "Absence reasons", "why people missed shifts."),
+        new ReportView("coverage", "Next 7 days coverage", "people scheduled per department vs. their usual daily staff (from today).", UsesDates: false),
+        new ReportView("shifts", "Shifts", "", Hidden: true),
+        new ReportView("tasks", "Open care tasks", "", UsesDates: false, Hidden: true)
+    };
+
+    [BindProperty(SupportsGet = true)] public int? DepartmentId { get; set; }
+    private List<Option> _departments = new();
 
     // A shift counts toward the department it was worked in, or the person's home department
     private const string ShiftDept = "COALESCE(s.Department_ID, e.Department_ID)";
+    private const string ShiftFrom = "FROM Employee_Shift s JOIN Employee e ON e.Employee_ID = s.Employee_ID";
+    private const string WorkedHours = $"COALESCE(SUM(CASE WHEN s.Status = 'Worked' THEN {PaidHours} END), 0)";
+    private const string WorkedCost = $"COALESCE(SUM(CASE WHEN s.Status = 'Worked' THEN {PaidHours} * {HourlyRate} END), 0)";
 
-    [BindProperty(SupportsGet = true)] public int? DepartmentId { get; set; }
-    public List<Option> DepartmentOptions { get; set; } = new();
+    private string DeptFilter => DepartmentId != null ? $" AND {ShiftDept} = @dept" : "";
+    private string ShiftWhere => "s.Shift_Date >= @from AND s.Shift_Date < @to AND s.Shift_Date <= CURDATE()" + DeptFilter;
 
-    // ---- Results ----
-    public decimal Hours { get; set; }
-    public decimal LaborCost { get; set; }
-    public int ShiftsWorked { get; set; }
-    public int Absences { get; set; }
-    public int StaffWorking { get; set; }
-    public decimal AbsenceRate => Pct(Absences, ShiftsWorked + Absences);
-    public decimal OvertimeHours => Overtime.Sum(o => o.Hours - 40);
-
-    public List<DeptRow> ByDepartment { get; set; } = new();
-    public List<PersonRow> People { get; set; } = new();
-    public List<WeekRow> Weeks { get; set; } = new();
-    public List<OvertimeRow> Overtime { get; set; } = new();
-    public List<ReasonRow> Reasons { get; set; } = new();
-
-    // Next 7 days: scheduled headcount per department per day vs. their usual daily headcount
-    public List<DateTime> NextDays { get; set; } = new();
-    public List<CoverageRow> Coverage { get; set; } = new();
-
-    public string FilterText => DepartmentId == null ? "" :
-        "Department: " + DepartmentOptions.FirstOrDefault(o => o.Id == DepartmentId)?.Name;
-
-    public async Task OnGetAsync() => await LoadAsync();
-
-    public async Task<IActionResult> OnGetExcelAsync()
+    protected override async Task LoadFiltersAsync(MySqlConnection conn)
     {
-        await LoadAsync();
-        var subtitle = $"{DateRangeText}{(FilterText == "" ? "" : " · " + FilterText)} · Generated {DateTime.Now:MMM d, yyyy h:mm tt}";
-
-        var xl = new ExcelReport("Staffing & Labor Report", subtitle)
-            .AddSheet("Summary", new[] { "Measure", "Value" }, new[]
-            {
-                new object?[] { "Hours worked", Hours },
-                new object?[] { "Estimated labor cost ($)", LaborCost },
-                new object?[] { "Shifts worked", ShiftsWorked },
-                new object?[] { "Staff who worked", StaffWorking },
-                new object?[] { "Absences", Absences },
-                new object?[] { "Absence rate (%)", AbsenceRate },
-                new object?[] { "Overtime hours (over 40/week)", OvertimeHours }
-            })
-            .AddSheet("By Department", new[] { "Department", "Staff", "Shifts", "Hours", "Hours per Person", "Absences", "Absence Rate (%)", "Labor Cost ($)", "Cost per Hour ($)", "Open Tasks" },
-                ByDepartment.Select(d => new object?[] { d.Name, d.Staff, d.Shifts, d.Hours, d.HoursPerPerson, d.Absences, d.AbsenceRate, d.Cost, d.CostPerHour, d.OpenTasks }),
-                row => (decimal)(row[6] ?? 0m) >= 10 ? ExcelReport.Yellow : null)
-            .AddSheet("By Employee", new[] { "Employee", "Department", "Job", "Shifts", "Hours", "Absences", "Overtime Weeks", "Open Tasks", "Labor Cost ($)" },
-                People.Select(p => new object?[] { p.Name, p.Department, p.Job, p.Shifts, p.Hours, p.Absences, p.OvertimeWeeks, p.OpenTasks, p.Cost }),
-                row => (int)(row[5] ?? 0) >= 3 || (int)(row[6] ?? 0) > 0 ? ExcelReport.Yellow : null)
-            .AddSheet("Weekly Trend", new[] { "Week Starting", "Shifts", "Hours", "Absences", "Absence Rate (%)", "Labor Cost ($)" },
-                Weeks.Select(w => new object?[] { w.WeekStart, w.Shifts, w.Hours, w.Absences, w.AbsenceRate, w.Cost }))
-            .AddSheet("Overtime", new[] { "Employee", "Week Starting", "Hours", "Overtime Hours" },
-                Overtime.Select(o => new object?[] { o.Name, o.WeekStart, o.Hours, o.Hours - 40 }))
-            .AddSheet("Absence Reasons", new[] { "Reason", "Absences" },
-                Reasons.Select(r => new object?[] { r.Reason, r.Count }))
-            .AddSheet("Next 7 Days", new[] { "Department", "Usual Daily Staff" }.Concat(NextDays.Select(d => d.ToString("ddd MMM d"))).ToArray(),
-                Coverage.Select(c => new object?[] { c.Department, c.UsualDaily }.Concat(c.Scheduled.Select(n => (object?)n)).ToArray()));
-
-        return File(xl.ToBytes(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    $"staffing-report-{DateTime.Today:yyyy-MM-dd}.xlsx");
+        _departments = await LoadOptionsAsync(conn, "SELECT Department_ID, Department_Name FROM Department ORDER BY Department_Name");
+        Filters.Add(new FilterField(nameof(DepartmentId), "Department", _departments, DepartmentId?.ToString()));
     }
 
-    private async Task LoadAsync()
+    private MySqlCommand Cmd(MySqlConnection conn, string sql)
     {
-        ResolveDates();
-        await using var conn = await OpenAsync();
-        DepartmentOptions = await LoadOptionsAsync(conn, "SELECT Department_ID, Department_Name FROM Department ORDER BY Department_Name");
+        var cmd = new MySqlCommand(sql, conn);
+        AddDateParams(cmd);
+        if (DepartmentId != null) cmd.Parameters.AddWithValue("@dept", DepartmentId);
+        return cmd;
+    }
 
-        var deptFilter = DepartmentId != null ? $" AND {ShiftDept} = @dept" : "";
-        var where = "s.Shift_Date >= @from AND s.Shift_Date < @to AND s.Shift_Date <= CURDATE()" + deptFilter;
-        const string from = "FROM Employee_Shift s JOIN Employee e ON e.Employee_ID = s.Employee_ID";
+    protected override Task<ReportTable> BuildAsync(MySqlConnection conn) => CurrentView.Key switch
+    {
+        "employee" => EmployeesAsync(conn),
+        "weekly" => WeeklyAsync(conn),
+        "overtime" => OvertimeAsync(conn),
+        "absences" => AbsencesAsync(conn),
+        "coverage" => CoverageAsync(conn),
+        "shifts" => ShiftsAsync(conn),
+        "tasks" => TasksAsync(conn),
+        _ => DepartmentsAsync(conn)
+    };
 
-        MySqlCommand Cmd(string sql)
-        {
-            var cmd = new MySqlCommand(sql, conn);
-            AddDateParams(cmd);
-            cmd.Parameters.AddWithValue("@dept", DepartmentId);
-            return cmd;
-        }
-
-        // 1. Totals
-        await using (var cmd = Cmd($@"
-            SELECT COALESCE(SUM(CASE WHEN s.Status = 'Worked' THEN s.Hours END), 0),
-                   COALESCE(SUM(CASE WHEN s.Status = 'Worked' THEN s.Hours * {HourlyRate} END), 0),
-                   SUM(s.Status = 'Worked'), SUM(s.Status = 'Absent'),
-                   COUNT(DISTINCT CASE WHEN s.Status = 'Worked' THEN s.Employee_ID END)
-            {from} WHERE {where}"))
-        await using (var r = await cmd.ExecuteReaderAsync())
-        {
-            if (await r.ReadAsync())
-            {
-                Hours = Math.Round(Dec(r, 0), 1);
-                LaborCost = Math.Round(Dec(r, 1), 2);
-                ShiftsWorked = Int(r, 2);
-                Absences = Int(r, 3);
-                StaffWorking = Int(r, 4);
-            }
-        }
-
-        // 2. By department, with open tasks as a workload signal
-        await using (var cmd = Cmd($@"
-            SELECT d.Department_Name,
+    // ===== By department =====
+    private async Task<ReportTable> DepartmentsAsync(MySqlConnection conn)
+    {
+        var t = Table(new Col("Department"), new Col("Staff", true), new Col("Shifts", true), new Col("Paid hours", true),
+                      new Col("Absences", true), new Col("Absence rate", true), new Col("Labor cost", true), new Col("Open tasks", true));
+        int sShifts = 0, sAbs = 0; decimal sHours = 0, sCost = 0;
+        await using var cmd = Cmd(conn, $@"
+            SELECT d.Department_ID, d.Department_Name,
                    COUNT(DISTINCT CASE WHEN s.Status = 'Worked' THEN s.Employee_ID END),
-                   SUM(s.Status = 'Worked'),
-                   COALESCE(SUM(CASE WHEN s.Status = 'Worked' THEN s.Hours END), 0),
-                   SUM(s.Status = 'Absent'),
-                   COALESCE(SUM(CASE WHEN s.Status = 'Worked' THEN s.Hours * {HourlyRate} END), 0),
-                   (SELECT COUNT(*) FROM Care_Task t JOIN Employee te ON te.Employee_ID = t.Assigned_Employee_ID
-                     WHERE te.Department_ID = d.Department_ID AND t.Status IN ('Open', 'In Progress'))
-            {from}
+                   SUM(s.Status = 'Worked'), {WorkedHours}, SUM(s.Status = 'Absent'), {WorkedCost},
+                   (SELECT COUNT(*) FROM Care_Task ct JOIN Employee te ON te.Employee_ID = ct.Assigned_Employee_ID
+                     WHERE te.Department_ID = d.Department_ID AND ct.Status IN ('Open', 'In Progress'))
+            {ShiftFrom}
             JOIN Department d ON d.Department_ID = {ShiftDept}
-            WHERE {where}
+            WHERE {ShiftWhere}
             GROUP BY d.Department_ID, d.Department_Name
-            ORDER BY 4 DESC"))
-        await using (var r = await cmd.ExecuteReaderAsync())
+            ORDER BY 5 DESC");
+        await using var r = await cmd.ExecuteReaderAsync();
+        while (await r.ReadAsync())
         {
-            while (await r.ReadAsync())
+            var id = r.GetInt32(0);
+            var key = "d:" + id;
+            int shifts = Int(r, 3), abs = Int(r, 5);
+            decimal hours = Math.Round(Dec(r, 4), 1), cost = Math.Round(Dec(r, 6), 2);
+            sShifts += shifts; sAbs += abs; sHours += hours; sCost += cost;
+            var rate = Pct(abs, shifts + abs);
+            t.Rows.Add(R(new[]
             {
-                ByDepartment.Add(new DeptRow
-                {
-                    Name = r.GetString(0),
-                    Staff = Int(r, 1),
-                    Shifts = Int(r, 2),
-                    Hours = Math.Round(Dec(r, 3), 1),
-                    Absences = Int(r, 4),
-                    Cost = Math.Round(Dec(r, 5), 2),
-                    OpenTasks = Int(r, 6)
-                });
-            }
+                T(r.GetString(1)), N(Int(r, 2), Drill("shifts", key, "worked")), N(shifts, Drill("shifts", key, "worked")),
+                Dec1(hours), N(abs, Drill("shifts", key, "absent")), PctCell(rate),
+                Money(cost, Drill("shifts", key, "worked")), N(Int(r, 7), Drill("tasks", key))
+            }, rate >= 10 ? "warn" : null, $"/Staff/DepartmentDetails/{id}"));
         }
-
-        // 3. Overtime: any employee-week over 40 hours worked
-        await using (var cmd = Cmd($@"
-            SELECT CONCAT(e.First_Name, ' ', e.Last_Name), MIN(s.Shift_Date), SUM(s.Hours), e.Employee_ID
-            {from}
-            WHERE {where} AND s.Status = 'Worked'
-            GROUP BY e.Employee_ID, e.First_Name, e.Last_Name, YEARWEEK(s.Shift_Date, 1)
-            HAVING SUM(s.Hours) > 40
-            ORDER BY SUM(s.Hours) DESC"))
-        await using (var r = await cmd.ExecuteReaderAsync())
+        t.Total = R(new[]
         {
-            while (await r.ReadAsync())
-                Overtime.Add(new OvertimeRow(r.GetString(0), r.GetDateTime(1), Math.Round(Dec(r, 2), 1), r.GetInt32(3)));
-        }
+            T("Total"), T(""), N(sShifts, Drill("shifts", "all", "worked")), Dec1(sHours),
+            N(sAbs, Drill("shifts", "all", "absent")), PctCell(Pct(sAbs, sShifts + sAbs)), Money(sCost, Drill("shifts", "all", "worked")), T("")
+        });
+        t.Note = "Yellow: absence rate of 10% or more. Hours are paid hours (30-minute unpaid break on shifts of 6+ hours). Open tasks are as of today.";
+        return t;
+    }
 
-        // 4. By employee: who is carrying the most, who is missing shifts
-        await using (var cmd = Cmd($@"
+    // ===== By employee =====
+    private async Task<ReportTable> EmployeesAsync(MySqlConnection conn)
+    {
+        var overtime = await OvertimeWeeksAsync(conn);
+        var t = Table(new Col("Employee"), new Col("Department"), new Col("Job"), new Col("Shifts", true), new Col("Paid hours", true),
+                      new Col("Absences", true), new Col("Overtime weeks", true), new Col("Labor cost", true));
+        await using var cmd = Cmd(conn, $@"
             SELECT e.Employee_ID, CONCAT(e.First_Name, ' ', e.Last_Name), d.Department_Name, e.Job_Position,
-                   SUM(s.Status = 'Worked'),
-                   COALESCE(SUM(CASE WHEN s.Status = 'Worked' THEN s.Hours END), 0),
-                   SUM(s.Status = 'Absent'),
-                   COALESCE(SUM(CASE WHEN s.Status = 'Worked' THEN s.Hours * {HourlyRate} END), 0),
-                   (SELECT COUNT(*) FROM Care_Task t WHERE t.Assigned_Employee_ID = e.Employee_ID
-                      AND t.Status IN ('Open', 'In Progress'))
-            {from}
+                   SUM(s.Status = 'Worked'), {WorkedHours}, SUM(s.Status = 'Absent'), {WorkedCost}
+            {ShiftFrom}
             LEFT JOIN Department d ON d.Department_ID = e.Department_ID
-            WHERE {where}
+            WHERE {ShiftWhere}
             GROUP BY e.Employee_ID, e.First_Name, e.Last_Name, d.Department_Name, e.Job_Position
-            ORDER BY 6 DESC"))
-        await using (var r = await cmd.ExecuteReaderAsync())
+            ORDER BY 6 DESC");
+        await using var r = await cmd.ExecuteReaderAsync();
+        while (await r.ReadAsync())
         {
-            while (await r.ReadAsync())
+            var id = r.GetInt32(0);
+            var key = "e:" + id;
+            int abs = Int(r, 6), ot = overtime.GetValueOrDefault(id);
+            t.Rows.Add(R(new[]
             {
-                var id = r.GetInt32(0);
-                People.Add(new PersonRow
-                {
-                    EmployeeId = id,
-                    Name = r.GetString(1),
-                    Department = Str(r, 2),
-                    Job = Str(r, 3),
-                    Shifts = Int(r, 4),
-                    Hours = Math.Round(Dec(r, 5), 1),
-                    Absences = Int(r, 6),
-                    Cost = Math.Round(Dec(r, 7), 2),
-                    OpenTasks = Int(r, 8),
-                    OvertimeWeeks = Overtime.Count(o => o.EmployeeId == id)
-                });
-            }
+                T(r.GetString(1)), T(Str(r, 2)), T(Str(r, 3)), N(Int(r, 4), Drill("shifts", key, "worked")),
+                Dec1(Math.Round(Dec(r, 5), 1)), N(abs, Drill("shifts", key, "absent")), N(ot),
+                Money(Math.Round(Dec(r, 7), 2), Drill("shifts", key, "worked"))
+            }, abs >= 3 || ot > 0 ? "warn" : null, $"/Staff/EmployeeDetails/{id}"));
         }
+        t.Note = "Yellow: 3+ absences, or worked overtime. Click a name to open the employee.";
+        return t;
+    }
 
-        // 5. Weekly trend
-        await using (var cmd = Cmd($@"
-            SELECT MIN(s.Shift_Date),
-                   SUM(s.Status = 'Worked'),
-                   COALESCE(SUM(CASE WHEN s.Status = 'Worked' THEN s.Hours END), 0),
-                   SUM(s.Status = 'Absent'),
-                   COALESCE(SUM(CASE WHEN s.Status = 'Worked' THEN s.Hours * {HourlyRate} END), 0)
-            {from}
-            WHERE {where}
+    private async Task<Dictionary<int, int>> OvertimeWeeksAsync(MySqlConnection conn)
+    {
+        var map = new Dictionary<int, int>();
+        await using var cmd = Cmd(conn, $@"
+            SELECT s.Employee_ID, COUNT(*) FROM (
+                SELECT s.Employee_ID, YEARWEEK(s.Shift_Date, 1) AS wk
+                {ShiftFrom}
+                WHERE {ShiftWhere} AND s.Status = 'Worked'
+                GROUP BY s.Employee_ID, wk
+                HAVING SUM({PaidHours}) > 40) s
+            GROUP BY s.Employee_ID");
+        await using var r = await cmd.ExecuteReaderAsync();
+        while (await r.ReadAsync()) map[r.GetInt32(0)] = Int(r, 1);
+        return map;
+    }
+
+    // ===== Week by week =====
+    private async Task<ReportTable> WeeklyAsync(MySqlConnection conn)
+    {
+        var t = Table(new Col("Week"), new Col("Shifts", true), new Col("Paid hours", true), new Col("Absences", true),
+                      new Col("Absence rate", true), new Col("Labor cost", true));
+        await using var cmd = Cmd(conn, $@"
+            SELECT YEARWEEK(s.Shift_Date, 1), MIN(s.Shift_Date), SUM(s.Status = 'Worked'), {WorkedHours}, SUM(s.Status = 'Absent'), {WorkedCost}
+            {ShiftFrom}
+            WHERE {ShiftWhere}
             GROUP BY YEARWEEK(s.Shift_Date, 1)
-            ORDER BY MIN(s.Shift_Date)"))
-        await using (var r = await cmd.ExecuteReaderAsync())
+            ORDER BY 1");
+        await using var r = await cmd.ExecuteReaderAsync();
+        while (await r.ReadAsync())
         {
-            while (await r.ReadAsync())
+            var key = "w:" + r.GetValue(0);
+            int shifts = Int(r, 2), abs = Int(r, 4);
+            var rate = Pct(abs, shifts + abs);
+            t.Rows.Add(R(new[]
             {
-                Weeks.Add(new WeekRow
-                {
-                    WeekStart = r.GetDateTime(0),
-                    Shifts = Int(r, 1),
-                    Hours = Math.Round(Dec(r, 2), 1),
-                    Absences = Int(r, 3),
-                    Cost = Math.Round(Dec(r, 4), 2)
-                });
-            }
+                T(WeekLabel(r.GetDateTime(1))), N(shifts, Drill("shifts", key, "worked")), Dec1(Math.Round(Dec(r, 3), 1)),
+                N(abs, Drill("shifts", key, "absent")), PctCell(rate), Money(Math.Round(Dec(r, 5), 2), Drill("shifts", key, "worked"))
+            }, rate >= 10 ? "warn" : null));
         }
+        t.Note = "Yellow: absence rate of 10% or more.";
+        return t;
+    }
 
-        // 6. Why people are absent
-        await using (var cmd = Cmd($@"
-            SELECT COALESCE(NULLIF(TRIM(s.Absence_Reason), ''), 'No reason given'), COUNT(*)
-            {from}
-            WHERE {where} AND s.Status = 'Absent'
-            GROUP BY 1
-            ORDER BY 2 DESC"))
-        await using (var r = await cmd.ExecuteReaderAsync())
+    // ===== Overtime =====
+    private async Task<ReportTable> OvertimeAsync(MySqlConnection conn)
+    {
+        var t = Table(new Col("Employee"), new Col("Week"), new Col("Shifts", true), new Col("Paid hours", true), new Col("Overtime hours", true));
+        await using var cmd = Cmd(conn, $@"
+            SELECT e.Employee_ID, CONCAT(e.First_Name, ' ', e.Last_Name), YEARWEEK(s.Shift_Date, 1), MIN(s.Shift_Date),
+                   COUNT(*), SUM({PaidHours})
+            {ShiftFrom}
+            WHERE {ShiftWhere} AND s.Status = 'Worked'
+            GROUP BY e.Employee_ID, e.First_Name, e.Last_Name, YEARWEEK(s.Shift_Date, 1)
+            HAVING SUM({PaidHours}) > 40
+            ORDER BY 6 DESC");
+        await using var r = await cmd.ExecuteReaderAsync();
+        while (await r.ReadAsync())
         {
-            while (await r.ReadAsync()) Reasons.Add(new ReasonRow(r.GetString(0), Int(r, 1)));
+            var id = r.GetInt32(0);
+            var hours = Math.Round(Dec(r, 5), 1);
+            t.Rows.Add(R(new[]
+            {
+                T(r.GetString(1)), T(WeekLabel(r.GetDateTime(3))),
+                N(Int(r, 4), Drill("shifts", $"ew:{id}:{r.GetValue(2)}", "worked")), Dec1(hours), Dec1(hours - 40)
+            }, hours - 40 >= 8 ? "bad" : "warn", $"/Staff/EmployeeDetails/{id}"));
         }
+        t.EmptyText = "Nobody went over 40 paid hours in a week.";
+        t.Note = "Red: 8+ overtime hours in one week. Click Shifts to see that week's shifts.";
+        return t;
+    }
 
-        // 7. Coverage for the next 7 days (always from today, not the date filter).
-        //    "Usual" = average people working per day in that department over the last 28 days.
-        for (int i = 0; i < 7; i++) NextDays.Add(DateTime.Today.AddDays(i));
+    // ===== Absence reasons =====
+    private async Task<ReportTable> AbsencesAsync(MySqlConnection conn)
+    {
+        var t = Table(new Col("Reason"), new Col("Absences", true), new Col("People", true), new Col("Share", true));
+        var rows = new List<(string Reason, int Count, int People)>();
+        await using (var cmd = Cmd(conn, $@"
+            SELECT COALESCE(NULLIF(TRIM(s.Absence_Reason), ''), 'No reason given'), COUNT(*), COUNT(DISTINCT s.Employee_ID)
+            {ShiftFrom}
+            WHERE {ShiftWhere} AND s.Status = 'Absent'
+            GROUP BY 1 ORDER BY 2 DESC"))
+        await using (var r = await cmd.ExecuteReaderAsync())
+            while (await r.ReadAsync()) rows.Add((r.GetString(0), Int(r, 1), Int(r, 2)));
 
-        var usual = new Dictionary<string, decimal>();
-        await using (var cmd = Cmd($@"
-            SELECT d.Department_Name, COUNT(*) / COUNT(DISTINCT s.Shift_Date)
-            {from}
+        int total = rows.Sum(x => x.Count);
+        foreach (var x in rows)
+            t.Rows.Add(R(new[] { T(x.Reason), N(x.Count, Drill("shifts", "r:" + x.Reason, "absent")), N(x.People), PctCell(Pct(x.Count, total)) }));
+        if (rows.Count > 0) t.Total = R(new[] { T("Total"), N(total, Drill("shifts", "all", "absent")), T(""), PctCell(100) });
+        t.EmptyText = "No absences in this date range.";
+        return t;
+    }
+
+    // ===== Next 7 days coverage =====
+    private async Task<ReportTable> CoverageAsync(MySqlConnection conn)
+    {
+        var days = Enumerable.Range(0, 7).Select(i => DateTime.Today.AddDays(i)).ToList();
+        var cols = new List<Col> { new("Department"), new("Usual per day", true) };
+        cols.AddRange(days.Select(d => new Col(d.ToString("ddd M/d"), true)));
+        var t = Table(cols.ToArray());
+
+        var depts = new Dictionary<int, string>();
+        var usual = new Dictionary<int, decimal>();
+        await using (var cmd = Cmd(conn, $@"
+            SELECT d.Department_ID, d.Department_Name, COUNT(*) / COUNT(DISTINCT s.Shift_Date)
+            {ShiftFrom}
             JOIN Department d ON d.Department_ID = {ShiftDept}
-            WHERE s.Status = 'Worked' AND s.Shift_Date BETWEEN CURDATE() - INTERVAL 28 DAY AND CURDATE() - INTERVAL 1 DAY {deptFilter}
+            WHERE s.Status = 'Worked' AND s.Shift_Date BETWEEN CURDATE() - INTERVAL 28 DAY AND CURDATE() - INTERVAL 1 DAY {DeptFilter}
             GROUP BY d.Department_ID, d.Department_Name"))
         await using (var r = await cmd.ExecuteReaderAsync())
-        {
-            while (await r.ReadAsync()) usual[r.GetString(0)] = Math.Round(Dec(r, 1), 1);
-        }
+            while (await r.ReadAsync()) { depts[r.GetInt32(0)] = r.GetString(1); usual[r.GetInt32(0)] = Math.Round(Dec(r, 2), 1); }
 
-        var scheduled = new Dictionary<(string, DateTime), int>();
-        await using (var cmd = Cmd($@"
-            SELECT d.Department_Name, s.Shift_Date, COUNT(*)
-            {from}
+        var scheduled = new Dictionary<(int, DateTime), int>();
+        await using (var cmd = Cmd(conn, $@"
+            SELECT d.Department_ID, d.Department_Name, s.Shift_Date, COUNT(*)
+            {ShiftFrom}
             JOIN Department d ON d.Department_ID = {ShiftDept}
-            WHERE s.Status <> 'Absent' AND s.Shift_Date BETWEEN CURDATE() AND CURDATE() + INTERVAL 6 DAY {deptFilter}
+            WHERE s.Status <> 'Absent' AND s.Shift_Date BETWEEN CURDATE() AND CURDATE() + INTERVAL 6 DAY {DeptFilter}
             GROUP BY d.Department_ID, d.Department_Name, s.Shift_Date"))
         await using (var r = await cmd.ExecuteReaderAsync())
-        {
-            while (await r.ReadAsync()) scheduled[(r.GetString(0), r.GetDateTime(1).Date)] = Int(r, 2);
-        }
+            while (await r.ReadAsync()) { depts[r.GetInt32(0)] = r.GetString(1); scheduled[(r.GetInt32(0), r.GetDateTime(2).Date)] = Int(r, 3); }
 
-        foreach (var dept in usual.Keys.Union(scheduled.Keys.Select(k => k.Item1)).OrderBy(n => n))
+        foreach (var (id, name) in depts.OrderBy(x => x.Value))
         {
-            Coverage.Add(new CoverageRow
+            var u = usual.GetValueOrDefault(id);
+            var cells = new List<Cell> { T(name), Dec1(u) };
+            bool shortDay = false;
+            foreach (var d in days)
             {
-                Department = dept,
-                UsualDaily = usual.TryGetValue(dept, out var u) ? u : 0,
-                Scheduled = NextDays.Select(d => scheduled.TryGetValue((dept, d), out var n) ? n : 0).ToList()
-            });
+                var n = scheduled.GetValueOrDefault((id, d));
+                bool low = u > 0 && n < u * 0.75m;
+                shortDay |= low;
+                var link = n == 0 ? null : Drill("shifts", $"dd:{id}:{d:yyyy-MM-dd}", "scheduled");
+                cells.Add(new Cell { Text = low ? $"{n} (low)" : n.ToString(), Value = n, Link = link });
+            }
+            t.Rows.Add(R(cells, shortDay ? "warn" : null, $"/Staff/DepartmentDetails/{id}"));
         }
+        t.EmptyText = "No shifts are scheduled for the next 7 days.";
+        t.Note = "Usual = average people working per day over the last 28 days. \"(low)\" means under 75% of usual; those rows are yellow.";
+        return t;
     }
 
-    public class DeptRow
+    // ===== Source records: shifts =====
+    private async Task<ReportTable> ShiftsAsync(MySqlConnection conn)
     {
-        public string Name { get; set; } = "";
-        public int Staff { get; set; }
-        public int Shifts { get; set; }
-        public decimal Hours { get; set; }
-        public int Absences { get; set; }
-        public decimal Cost { get; set; }
-        public int OpenTasks { get; set; }
-        public decimal HoursPerPerson => Staff == 0 ? 0 : Math.Round(Hours / Staff, 1);
-        public decimal AbsenceRate => Pct(Absences, Shifts + Absences);
-        public decimal CostPerHour => Hours == 0 ? 0 : Math.Round(Cost / Hours, 2);
+        var kind = Key2 ?? "worked";
+        var (type, text) = SplitKey(Key);
+        bool future = type == "dd";
+        var where = future ? "1=1" + DeptFilter : ShiftWhere;
+        var title = new List<string>();
+        switch (kind)
+        {
+            case "absent": where += " AND s.Status = 'Absent'"; title.Add("Absences"); break;
+            case "scheduled": where += " AND s.Status <> 'Absent'"; title.Add("Scheduled shifts"); break;
+            default: where += " AND s.Status = 'Worked'"; title.Add("Worked shifts"); break;
+        }
+
+        var cmdText = "";
+        object? k = null, k2 = null;
+        switch (type)
+        {
+            case "d": where += $" AND {ShiftDept} = @k"; k = text; title.Add(OptionName(_departments, IntOrNull(text)) ?? "department"); break;
+            case "e": where += " AND s.Employee_ID = @k"; k = text; break;
+            case "w": where += " AND YEARWEEK(s.Shift_Date, 1) = @k"; k = text; break;
+            case "r":
+                where += text == "No reason given"
+                    ? " AND NULLIF(TRIM(s.Absence_Reason), '') IS NULL"
+                    : " AND TRIM(s.Absence_Reason) = @k";
+                k = text;
+                title.Add(text);
+                break;
+            case "ew":
+                var p = text.Split(':');
+                where += " AND s.Employee_ID = @k AND YEARWEEK(s.Shift_Date, 1) = @k2";
+                k = p[0]; k2 = p.Length > 1 ? p[1] : "";
+                break;
+            case "dd":
+                var q = text.Split(':');
+                where += $" AND {ShiftDept} = @k AND s.Shift_Date = @k2";
+                k = q[0]; k2 = q.Length > 1 ? q[1] : "";
+                title.Add(OptionName(_departments, IntOrNull(q[0])) ?? "department");
+                if (DateTime.TryParse(k2 as string, out var day)) title.Add(day.ToString("ddd, MMM d"));
+                break;
+        }
+
+        var t = Table(new Col("Date"), new Col("Employee"), new Col("Department"), new Col("Start"), new Col("End"),
+                      new Col("Paid hours", true), new Col("Status"), new Col("Absence reason"), new Col("Cost", true));
+        cmdText = $@"
+            SELECT s.Shift_Date, e.Employee_ID, CONCAT(e.First_Name, ' ', e.Last_Name), d.Department_Name,
+                   s.Start_Time, s.End_Time, {PaidHours}, s.Status, s.Absence_Reason,
+                   CASE WHEN s.Status = 'Worked' THEN {PaidHours} * {HourlyRate} ELSE 0 END
+            {ShiftFrom}
+            LEFT JOIN Department d ON d.Department_ID = {ShiftDept}
+            WHERE {where}
+            ORDER BY s.Shift_Date DESC, e.Last_Name
+            LIMIT 500";
+        await using var cmd = Cmd(conn, cmdText);
+        if (k != null) cmd.Parameters.AddWithValue("@k", k);
+        if (k2 != null) cmd.Parameters.AddWithValue("@k2", k2);
+        await using var r = await cmd.ExecuteReaderAsync();
+        decimal hours = 0, cost = 0;
+        string? person = null;
+        DateTime? firstDay = null;
+        while (await r.ReadAsync())
+        {
+            person ??= r.GetString(2);
+            firstDay = r.GetDateTime(0);
+            var status = Str(r, 7);
+            decimal h = status == "Worked" ? Dec(r, 6) : 0, c = Math.Round(Dec(r, 9), 2);
+            hours += h; cost += c;
+            t.Rows.Add(R(new[]
+            {
+                D(r.GetDateTime(0)), T(r.GetString(2), $"/Staff/EmployeeDetails/{r.GetInt32(1)}"), T(Str(r, 3)),
+                T(Str(r, 4)), T(Str(r, 5)), status == "Worked" ? Dec1(h) : T("—"), T(status), T(Str(r, 8)), Money(c)
+            }, status == "Absent" ? "warn" : null));
+        }
+        if (t.Rows.Count > 0 && kind != "absent")
+            t.Total = R(new[] { T("Total"), T(""), T(""), T(""), T(""), Dec1(hours), T(""), T(""), Money(cost) });
+        if ((type == "e" || type == "ew") && person != null) title.Add(person);
+        if ((type == "w" || type == "ew") && firstDay != null) title.Add(WeekLabel(firstDay.Value));
+        ResultTitle = string.Join(" · ", title);
+        t.Note = "Paid hours subtract a 30-minute unpaid break on shifts of 6+ hours. Click a name to open the employee. Shows up to 500 shifts.";
+        return t;
     }
 
-    public class PersonRow
+    // ===== Source records: a department's open care tasks =====
+    private async Task<ReportTable> TasksAsync(MySqlConnection conn)
     {
-        public int EmployeeId { get; set; }
-        public string Name { get; set; } = "";
-        public string? Department { get; set; }
-        public string? Job { get; set; }
-        public int Shifts { get; set; }
-        public decimal Hours { get; set; }
-        public int Absences { get; set; }
-        public int OvertimeWeeks { get; set; }
-        public int OpenTasks { get; set; }
-        public decimal Cost { get; set; }
-    }
-
-    public class WeekRow
-    {
-        public DateTime WeekStart { get; set; }
-        public int Shifts { get; set; }
-        public decimal Hours { get; set; }
-        public int Absences { get; set; }
-        public decimal Cost { get; set; }
-        public decimal AbsenceRate => Pct(Absences, Shifts + Absences);
-    }
-
-    public record OvertimeRow(string Name, DateTime WeekStart, decimal Hours, int EmployeeId);
-    public record ReasonRow(string Reason, int Count);
-
-    public class CoverageRow
-    {
-        public string Department { get; set; } = "";
-        public decimal UsualDaily { get; set; }
-        public List<int> Scheduled { get; set; } = new();
-        // Below 75% of the usual headcount is flagged as short-staffed
-        public bool IsShort(int n) => UsualDaily > 0 && n < UsualDaily * 0.75m;
+        var (_, text) = SplitKey(Key);
+        var t = Table(new Col("Task"), new Col("Animal"), new Col("Assigned to"), new Col("Priority"), new Col("Due"), new Col("Status"));
+        await using var cmd = new MySqlCommand(@"
+            SELECT ct.Title, ct.Animal_ID, a.Animal_Name, CONCAT(e.First_Name, ' ', e.Last_Name), ct.Priority, ct.Due_At, ct.Status
+            FROM Care_Task ct
+            JOIN Employee e ON e.Employee_ID = ct.Assigned_Employee_ID
+            LEFT JOIN Animal a ON a.Animal_ID = ct.Animal_ID
+            WHERE e.Department_ID = @k AND ct.Status IN ('Open', 'In Progress')
+            ORDER BY (ct.Due_At < NOW()) DESC, FIELD(ct.Priority, 'Urgent', 'High', 'Normal', 'Low'), ct.Due_At", conn);
+        cmd.Parameters.AddWithValue("@k", IntOrNull(text) ?? 0);
+        await using var r = await cmd.ExecuteReaderAsync();
+        while (await r.ReadAsync())
+        {
+            var due = DateOrNull(r, 5);
+            t.Rows.Add(R(new[]
+            {
+                T(Str(r, 0)), r.IsDBNull(1) ? T("—") : T(Str(r, 2), $"/Animals/Details/{r.GetInt32(1)}"),
+                T(Str(r, 3)), T(Str(r, 4)), T(due?.ToString("MMM d, h:mm tt") ?? "—"), T(Str(r, 6))
+            }, due != null && due < DateTime.Now ? "bad" : null));
+        }
+        ResultTitle = "Open care tasks: " + (OptionName(_departments, IntOrNull(text)) ?? "department");
+        t.EmptyText = "No open tasks.";
+        t.Note = "Red: past due.";
+        return t;
     }
 }

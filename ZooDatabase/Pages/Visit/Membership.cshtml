@@ -1,0 +1,39 @@
+@page "/visit/membership"
+@model ZooDatabase.Pages.Visit.MembershipModel
+@{
+    ViewData["Title"] = "Memberships";
+}
+
+<section class="page-banner">
+    <div class="pub-wrap">
+        <h1>Become a Member</h1>
+    </div>
+</section>
+
+<section class="pub-section">
+    <div class="pub-wrap buy-layout">
+        <partial name="_ShopNav" model="@("membership")" />
+
+        <div class="buy-main">
+            <h2 class="buy-title">Memberships</h2>
+            <p class="pub-lead">A full year of unlimited visits, starting the day you choose at checkout.</p>
+            <div class="buy-box">
+                @foreach (var m in Model.Levels)
+                {
+                    <div class="ticket-row">
+                        <div class="ticket-name">
+                            <span>@m.Name</span>
+                            @if (!string.IsNullOrWhiteSpace(m.Note)) { <small>@m.Note</small> }
+                        </div>
+                        <div class="ticket-price">@m.Price.ToString("C") <small>/ year</small></div>
+                        <form method="post" asp-page-handler="Add">
+                            <input type="hidden" name="typeId" value="@m.Id" />
+                            <button type="submit" class="pub-btn pub-btn--green pub-btn--small">Choose</button>
+                        </form>
+                    </div>
+                }
+            </div>
+            <p class="pub-note">One membership per order. Choosing a different level replaces the one in your cart.</p>
+        </div>
+    </div>
+</section>

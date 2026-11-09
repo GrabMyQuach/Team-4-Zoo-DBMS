@@ -1,5 +1,6 @@
 @page
 @model LoginModel
+@using ZooDatabase.Data
 @{
     Layout = null;
 }
@@ -8,21 +9,24 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Log in - Zoo Management System</title>
+    <title>Staff log in · @PublicSite.ZooName</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
     <style>
-        body { background: #f4f6f5; min-height: 100vh; display: flex; flex-direction: column; }
+        body { background: #1F5A43; min-height: 100vh; display: flex; flex-direction: column; font-family: Inter, system-ui, sans-serif; }
         .login-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
-        .login-card { background: #fff; border: 1px solid #e3e7e5; border-radius: 16px; padding: 48px 40px;
+        .login-card { background: #fff; border: none; border-radius: 20px; padding: 48px 40px;
                       width: 100%; max-width: 440px; box-shadow: 0 4px 24px rgba(0,0,0,.05); }
         .brand { text-align: center; margin-bottom: 32px; }
         .brand-icon { font-size: 56px; line-height: 1; }
-        .brand-name { font-size: 28px; font-weight: 700; color: #1f5f3f; margin-top: 8px; }
-        .brand-sub { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #8a948f; }
-        .form-control { padding: 12px 14px; border-radius: 8px; }
-        .btn-zoo { background: #1f5f3f; color: #fff; border-radius: 999px; padding: 12px; font-weight: 600; }
-        .btn-zoo:hover { background: #174a31; color: #fff; }
-        .footer-note { text-align: center; font-size: 13px; color: #6c757d; padding: 16px; }
+        .brand-name { font-family: Fraunces, Georgia, serif; font-size: 40px; font-weight: 700; color: #123B2C; margin-top: 8px; }
+        .brand-sub { font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #4E5B53; }
+        .form-control { padding: 12px 14px; border-radius: 12px; border: 2px solid #E3DED3; }
+        .form-control:focus { border-color: #1F5A43; box-shadow: 0 0 0 3px rgba(242,181,68,.55); }
+        .btn-zoo { background: #F2B544; color: #1B2A22; border-radius: 999px; padding: 12px; font-weight: 700; }
+        .btn-zoo:hover { background: #E5A630; color: #1B2A22; }
+        .footer-note { text-align: center; font-size: 13px; color: #D6E2D8; padding: 16px; }
+        .login-card a { color: #1F5A43; font-weight: 600; }
         .brand-logo { width: 100%; max-width: 280px; height: auto; }
     </style>
 </head>
@@ -30,12 +34,11 @@
     <div class="login-wrap">
         <div class="login-card">
             <div class="brand">
-                <img src="~/images/zoo-logo.jpg" alt="Zoo logo" class="brand-logo" />
-                <div class="brand-name">Zoo Management</div>
+                <div class="brand-name">@PublicSite.ZooName</div>
                 <div class="brand-sub">Staff Portal</div>
             </div>
 
-            <h5 class="mb-3 fw-semibold">Sign in to your account</h5>
+            <h5 class="mb-3 fw-semibold text-center">Sign in to your account</h5>
 
             @if (Model.ErrorMessage != null)
             {
@@ -51,12 +54,15 @@
                 </div>
                 <button type="submit" class="btn btn-zoo w-100">Log in</button>
             </form>
+            <div class="text-center mt-3">
+                <a href="/" class="text-decoration-none">&larr; Back to the zoo website</a>
+            </div>
         </div>
     </div>
 
     <div class="footer-note">
         This system is for authorized zoo staff only. Unauthorized use is prohibited.<br />
-        © 2026 Team 4 Zoo Management System
+        © 2026 @PublicSite.ZooName · Team 4 Zoo Management System
     </div>
 </body>
 </html>

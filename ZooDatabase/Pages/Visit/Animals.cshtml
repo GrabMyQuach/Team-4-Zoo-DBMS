@@ -1,0 +1,43 @@
+@page "/visit/animals"
+@model ZooDatabase.Pages.Visit.AnimalsModel
+@{
+    ViewData["Title"] = "Our Animals";
+}
+
+<section class="page-banner">
+    <div class="pub-wrap">
+        <h1>Our Animals</h1>
+    </div>
+</section>
+
+<section class="pub-section pub-section--sand">
+    <div class="pub-wrap">
+        <form method="get" class="pub-search" role="search">
+            <label for="q">Search by name, species or habitat</label>
+            <div class="pub-search-row">
+                <input id="q" name="q" type="search" value="@Model.Q" placeholder="Try &quot;penguin&quot;" />
+                <button type="submit" class="pub-btn pub-btn--green">Search</button>
+                @if (!string.IsNullOrWhiteSpace(Model.Q))
+                {
+                    <a class="pub-link" href="/visit/animals">Clear</a>
+                }
+            </div>
+        </form>
+
+        <p class="pub-count">@Model.Animals.Count @(Model.Animals.Count == 1 ? "animal" : "animals")</p>
+
+        @if (Model.Animals.Count == 0)
+        {
+            <p>No animals match "@Model.Q".</p>
+        }
+        else
+        {
+            <div class="pub-grid">
+                @foreach (var a in Model.Animals)
+                {
+                    <partial name="_AnimalCard" model="a" />
+                }
+            </div>
+        }
+    </div>
+</section>

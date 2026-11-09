@@ -9,6 +9,59 @@
     <h1 class="h2 mb-0">Feed</h1>
 </div>
 
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+
+@if (Model.Orders.Count > 0)
+{
+    <div class="card mb-4">
+        <div class="card-body pb-0">
+            <h2 class="h5 section-heading">Restock Orders Waiting</h2>
+            <p class="small text-muted">Drafted automatically when a feed drops to its reorder level. Approve to order it, then mark it received when it arrives to add it to stock.</p>
+        </div>
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead class="table-light">
+                    <tr><th>Order</th><th>Feed</th><th>Supplier</th><th class="text-end">Amount</th><th class="text-end">Cost</th><th>Status</th>@if (Model.CanManageOrders) { <th></th> }</tr>
+                </thead>
+                <tbody>
+                    @foreach (var o in Model.Orders)
+                    {
+                        <tr>
+                            <td>#@o.Id<div class="small text-muted">@o.OrderDate?.ToString("MMM d")</div></td>
+                            <td class="fw-semibold">@o.Feed</td>
+                            <td>@(o.Supplier ?? "—")</td>
+                            <td class="text-end">@o.Quantity.ToString("0.##") @o.Unit</td>
+                            <td class="text-end">@(o.Total?.ToString("C") ?? "—")</td>
+                            <td>
+                                <span class="badge @(o.Status == "Draft" ? "bg-warning text-dark" : "bg-info text-dark")">@(o.Status == "Draft" ? "Needs approval" : "Ordered")</span>
+                                @if (o.ExpectedDelivery != null) { <div class="small text-muted">due @o.ExpectedDelivery.Value.ToString("MMM d")</div> }
+                            </td>
+                            @if (Model.CanManageOrders)
+                            {
+                                <td class="text-end text-nowrap">
+                                    <form method="post" asp-page-handler="Order" class="d-inline">
+                                        <input type="hidden" name="poId" value="@o.Id" />
+                                        @if (o.Status == "Draft")
+                                        {
+                                            <button name="status" value="Ordered" class="btn btn-sm btn-primary rounded-pill px-3">Approve</button>
+                                        }
+                                        <button name="status" value="Received" class="btn btn-sm btn-outline-primary rounded-pill px-3">Mark Received</button>
+                                        <button name="status" value="Cancelled" class="btn btn-sm btn-outline-secondary rounded-pill px-3"
+                                                onclick="return confirm('Cancel this order?');">Cancel</button>
+                                    </form>
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
 <div class="card">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
@@ -36,7 +89,10 @@
                         <td>@(f.EatenBy ?? "—")</td>
                         <td>@(f.Supplier ?? "—")</td>
                         <td>@f.StorageLocation</td>
-                        <td class="text-end">@f.QuantityInStock?.ToString("0.##")</td>
+                        <td class="text-end">
+                            @f.QuantityInStock?.ToString("0.##") @f.Unit
+                            @if (f.IsLow) { <span class="badge bg-danger ms-1">Low</span> }
+                        </td>
                         <td>
                             @if (f.ExpirationDate == null)
                             {

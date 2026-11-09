@@ -10,11 +10,27 @@ public static class StaffOptions
 
     public static bool CanEdit(ClaimsPrincipal user) => user.IsInRole("DBA");
 
+    // Roles allowed to create and update maintenance requests (Staff > Maintenance).
+    public const string MaintenanceEditorRoles = "DBA,SuperUser,Admin";
+
+    public static bool CanEditMaintenance(ClaimsPrincipal user) =>
+        MaintenanceEditorRoles.Split(',').Any(user.IsInRole);
+
+    // Roles allowed to mark someone absent for a shift (Employee page > Shifts)
+    public const string AttendanceRoles = "DBA,SuperUser,Admin";
+
+    public static bool CanMarkAbsent(ClaimsPrincipal user) =>
+        AttendanceRoles.Split(',').Any(user.IsInRole);
+
+    // These must match the database: the Priority ENUM and the chk_maintenance_status rule
+    public static readonly string[] MaintenancePriorities = { "Low", "Normal", "High", "Emergency" };
+    public static readonly string[] MaintenanceStatuses = { "Open", "Pending", "In Progress", "Completed", "Cancelled" };
+
     // Private details (SSN, pay, address, login) are only shown to these roles
     public static bool CanSeePrivate(ClaimsPrincipal user) => user.IsInRole("DBA") || user.IsInRole("SuperUser");
 
     public static readonly string[] Genders = { "Female", "Male", "Other" };
-    public static readonly string[] EmploymentTypes = { "Full-Time", "Part-Time", "Seasonal", "Contract" };
+    public static readonly string[] EmploymentTypes = { "Full-Time", "Part-Time" };
     public static readonly string[] PayTypes = { "Salary", "Hourly" };
     public static readonly string[] ExperienceLevels = { "Junior", "Intermediate", "Senior" };
 

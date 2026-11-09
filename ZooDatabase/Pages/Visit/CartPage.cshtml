@@ -1,0 +1,157 @@
+@page "/visit/cart"
+@model ZooDatabase.Pages.Visit.CartPageModel
+@using ZooDatabase.Data
+@using ZooDatabase.Pages.Visit
+@{
+    bool checkout = Model.Step == "checkout";
+    ViewData["Title"] = checkout ? "Checkout" : "Your Cart";
+}
+
+<section class="page-banner">
+    <div class="pub-wrap">
+        <h1>@(checkout ? "Checkout" : "Your Cart")</h1>
+    </div>
+</section>
+
+<section class="pub-section">
+    <div class="pub-wrap buy-layout">
+        <partial name="_ShopNav" model="@("cart")" />
+
+        <div class="buy-main">
+            @if (Model.Lines.Count == 0)
+            {
+                <h2 class="buy-title">Your cart is empty</h2>
+                <div class="buy-box">
+                    <p class="pub-lead">Add tickets, a membership or a few gifts to get started.</p>
+                    <div class="pub-actions">
+                        <a class="pub-btn pub-btn--green" href="/visit/tickets">Buy tickets</a>
+                        <a class="pub-btn pub-btn--dark" href="/visit/membership">Memberships</a>
+                        <a class="pub-btn pub-btn--dark" href="/visit/shop">Shop gifts</a>
+                    </div>
+                </div>
+            }
+            else if (!checkout)
+            {
+                <h2 class="buy-title">Items</h2>
+                @if (Model.ErrorMessage != null)
+                {
+                    <div class="pub-alert" role="alert">@Model.ErrorMessage</div>
+                }
+                <form method="post" asp-page-handler="Update">
+                    <div class="buy-box">
+                        @foreach (var l in Model.Lines)
+                        {
+                            <div class="ticket-row">
+                                <div class="ticket-name">
+                                    <span>@l.Name</span>
+                                    @if (!string.IsNullOrWhiteSpace(l.Detail)) { <small>@l.Detail</small> }
+                                    <button type="submit" name="Remove" value="@(l.Kind == "M" ? "M" : $"{l.Kind}:{l.Id}")" class="cart-remove">Remove</button>
+                                </div>
+                                <div class="ticket-price">@l.UnitPrice.ToString("C")</div>
+                                @if (l.Kind == "M")
+                                {
+                                    <div class="stepper stepper--fixed">1</div>
+                                }
+                                else
+                                {
+                                    var field = l.Kind == "T" ? "TicketQty" : "ProductQty";
+                                    <div class="stepper">
+                                        <button type="button" data-step="-1" data-target="q-@l.Kind-@l.Id" aria-label="One less @l.Name">−</button>
+                                        <input id="q-@l.Kind-@l.Id" name="@(field)[@l.Id]" type="number" min="0" max="@Cart.MaxPerLine" value="@l.Qty" aria-label="How many @l.Name" />
+                                        <button type="button" data-step="1" data-target="q-@l.Kind-@l.Id" aria-label="One more @l.Name">+</button>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        @if (Model.HasTickets)
+                        {
+                            <p class="cart-visit">Visit date: <strong>@Model.VisitDate.ToString("dddd, MMMM d, yyyy")</strong> · <a href="/visit/tickets">change</a></p>
+                        }
+                        <div class="buy-continue buy-continue--left">
+                            <button type="submit" class="pub-btn pub-btn--outline">Update cart</button>
+                        </div>
+                    </div>
+                </form>
+
+                <h2 class="buy-title">Totals</h2>
+                <div class="totals">
+                    <div class="totals-row"><span>Subtotal:</span><span>@Model.Total.ToString("C")</span></div>
+                    <div class="totals-row"><span>Tax:</span><span>@(0m.ToString("C"))</span></div>
+                    <div class="totals-row totals-row--total"><span>Total:</span><span>@Model.Total.ToString("C")</span></div>
+                </div>
+                <div class="totals-actions">
+                    <a class="pub-btn pub-btn--dark" href="/visit/tickets">← Continue Shopping</a>
+                    <a class="pub-btn pub-btn--green" href="/visit/cart?step=checkout">Checkout →</a>
+                </div>
+            }
+            else
+            {
+                <h2 class="buy-title">Your information</h2>
+                @if (Model.ErrorMessage != null)
+                {
+                    <div class="pub-alert" role="alert">@Model.ErrorMessage</div>
+                }
+                <div class="checkout-layout">
+                    <form method="post" asp-page-handler="Checkout" class="buy-box">
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="FirstName">First name</label>
+                                <input id="FirstName" name="FirstName" value="@Model.FirstName" autocomplete="given-name" required />
+                            </div>
+                            <div class="field">
+                                <label for="LastName">Last name</label>
+                                <input id="LastName" name="LastName" value="@Model.LastName" autocomplete="family-name" required />
+                            </div>
+                            <div class="field field--wide">
+                                <label for="Email">Email</label>
+                                <input id="Email" name="Email" type="email" value="@Model.Email" autocomplete="email" required />
+                            </div>
+                            <div class="field field--wide">
+                                <label for="Phone">Phone (optional)</label>
+                                <input id="Phone" name="Phone" type="tel" value="@Model.Phone" autocomplete="tel" />
+                            </div>
+                            @if (Model.HasTickets)
+                            {
+                                <div class="field">
+                                    <label for="VisitDate">Visit date</label>
+                                    <input id="VisitDate" name="VisitDate" type="date" value="@Model.VisitDate.ToString("yyyy-MM-dd")" min="@DateTime.Today.ToString("yyyy-MM-dd")" max="@DateTime.Today.AddYears(1).ToString("yyyy-MM-dd")" required />
+                                </div>
+                            }
+                            @if (Model.HasMembership)
+                            {
+                                <div class="field">
+                                    <label for="MemberStart">Membership starts</label>
+                                    <input id="MemberStart" name="MemberStart" type="date" value="@Model.MemberStart.ToString("yyyy-MM-dd")" min="@DateTime.Today.ToString("yyyy-MM-dd")" max="@DateTime.Today.AddMonths(3).ToString("yyyy-MM-dd")" required />
+                                </div>
+                            }
+                            <div class="field field--wide">
+                                <label for="PaymentMethod">Payment method</label>
+                                <select id="PaymentMethod" name="PaymentMethod">
+                                    @foreach (var p in VisitData.OnlinePayments)
+                                    {
+                                        <option value="@p" selected="@(p == Model.PaymentMethod)">@p</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+                        <p class="demo-note">Class project demo: no real payment is taken, and we never ask for card numbers.</p>
+                        <div class="totals-actions">
+                            <a class="pub-btn pub-btn--dark" href="/visit/cart">← Back to cart</a>
+                            <button type="submit" class="pub-btn pub-btn--green">Place order · @Model.Total.ToString("C")</button>
+                        </div>
+                    </form>
+
+                    <aside class="order-summary" aria-label="Order summary">
+                        <h3>Order summary</h3>
+                        @foreach (var l in Model.Lines)
+                        {
+                            <div class="totals-row"><span>@l.Qty × @l.Name</span><span>@l.Total.ToString("C")</span></div>
+                        }
+                        <div class="totals-row"><span>Tax</span><span>@(0m.ToString("C"))</span></div>
+                        <div class="totals-row totals-row--total"><span>Total</span><span>@Model.Total.ToString("C")</span></div>
+                    </aside>
+                </div>
+            }
+        </div>
+    </div>
+</section>

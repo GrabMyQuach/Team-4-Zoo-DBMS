@@ -2,6 +2,7 @@ using System.Data.Common;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using MySqlConnector;
+using ZooDatabase.Data;
 
 namespace ZooDatabase.Pages.Animals;
 
@@ -22,6 +23,8 @@ public class EnclosureDetailsModel : PageModel
     public List<InspectionRow> Inspections { get; set; } = new();
 
     public bool CanEdit => User.IsInRole("DBA");
+
+    public bool CanInspect => AnimalOptions.CanInspect(User);
 
     public async Task<IActionResult> OnGetAsync(int id)
     {

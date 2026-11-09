@@ -1,3 +1,4 @@
 @page
 @model ZooDatabase.Pages.Shop.FoodStandsModel
+@{ ViewData["Title"] = Model.Kind.Plural; }
 <partial name="_OutletList" model="Model" />

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using MySqlConnector;
+using ZooDatabase.Data;
 
 namespace ZooDatabase.Pages.Staff;
 
@@ -18,6 +19,8 @@ public class MaintenanceModel : PageModel
     public string Show { get; set; } = "open";
 
     public List<MaintenanceRow> Rows { get; set; } = new();
+
+    public bool CanEdit => StaffOptions.CanEditMaintenance(User);
 
     public async Task OnGetAsync()
     {

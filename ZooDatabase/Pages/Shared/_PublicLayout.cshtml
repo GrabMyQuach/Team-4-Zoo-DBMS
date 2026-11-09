@@ -1,0 +1,75 @@
+@using ZooDatabase.Data
+@{
+    // Layout for the public website. Pages with a big photo at the top set ViewData["Hero"] = true
+    // so the menu sits on top of the photo in white.
+    bool hero = ViewData["Hero"] as bool? == true;
+    bool loggedIn = User.Identity?.IsAuthenticated == true;
+    int cartCount = Cart.Load(Context.Session).ItemCount;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] · @PublicSite.ZooName</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/public.css" asp-append-version="true" />
+</head>
+<body class="pub">
+    <div class="pub-announce">Open today @PublicSite.Hours · Last entry at @PublicSite.LastEntry</div>
+
+    <header class="pub-header @(hero ? "pub-header--over" : "")">
+        <div class="pub-wrap">
+            <div class="pub-utility">
+                <a href="/visit/tickets">Tickets</a>
+                <a href="/visit/membership">Membership</a>
+                <a href="/visit/cart">Cart (@cartCount)</a>
+                @if (loggedIn)
+                {
+                    <a class="pub-pill" href="/Dashboard">Staff dashboard</a>
+                }
+                else
+                {
+                    <a class="pub-pill" href="/Login">Staff login</a>
+                }
+            </div>
+            <div class="pub-mainnav">
+                <a class="pub-logo" href="/">@PublicSite.ZooName</a>
+                <nav aria-label="Main">
+                    <a href="/visit/animals">Animals</a>
+                    <a href="/visit/tickets">Plan Your Visit</a>
+                    <a href="/visit/shop">Shop Online</a>
+                    <a href="/visit/membership">Membership</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        @RenderBody()
+    </main>
+
+    <footer class="pub-footer">
+        <div class="pub-wrap pub-footer-grid">
+            <div>
+                <div class="pub-footer-logo">@PublicSite.ZooName</div>
+                <p>@PublicSite.City</p>
+                <p>Open every day @PublicSite.Hours</p>
+            </div>
+            <nav aria-label="Footer" class="pub-footer-links">
+                <a href="/visit/animals">Animals</a>
+                <a href="/visit/tickets">Tickets</a>
+                <a href="/visit/membership">Membership</a>
+                <a href="/visit/shop">Shop Online</a>
+                <a href="@(loggedIn ? "/Dashboard" : "/Login")">Staff login</a>
+            </nav>
+        </div>
+        <div class="pub-wrap pub-footer-note">&copy; 2026 @PublicSite.ZooName · COSC 3380 Team 4 project</div>
+    </footer>
+
+    <script src="~/js/public.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

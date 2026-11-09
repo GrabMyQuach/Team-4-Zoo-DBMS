@@ -11,21 +11,57 @@ public static class AnimalOptions
 
     public static bool CanEdit(ClaimsPrincipal user) =>
         EditorRoles.Split(',').Any(user.IsInRole);
+    public const string HealthEditorRoles = "DBA,SuperUser,Admin,Veterinarian";
+
+    public static bool CanRecordHealth(ClaimsPrincipal user) =>
+    HealthEditorRoles.Split(',').Any(user.IsInRole);
+
+    public static readonly string[] RecordTypes =
+    { "Routine Checkup", "Illness", "Injury", "Vaccination", "Follow-up", "Neonatal Exam" };
+
+    public static readonly string[] Severities = { "Low", "Moderate", "High", "Critical" };
+
+    // Roles allowed to log feedings (Animals > Details > Log Feeding). Same roles as the Feed page.
+    public const string FeedingEditorRoles = "Zookeeper,Veterinarian,Admin,SuperUser,DBA";
+
+    public static bool CanLogFeeding(ClaimsPrincipal user) =>
+        FeedingEditorRoles.Split(',').Any(user.IsInRole);
+
+    // Must match the Status ENUM on Feeding_Log in the database
+    public static readonly string[] FeedingStatuses = { "Completed", "Partial", "Refused", "Missed" };
+
+    // Roles allowed to record habitat inspections (Enclosure page > Record Inspection)
+    public const string InspectionRoles = "Zookeeper,Admin,SuperUser,DBA";
+
+    public static bool CanInspect(ClaimsPrincipal user) =>
+        InspectionRoles.Split(',').Any(user.IsInRole);
+
+    // Must match the Result and Issue_Category ENUMs on Habitat_Inspection
+    public static readonly string[] InspectionResults = { "Pass", "Minor Issues", "Critical" };
+    public static readonly string[] IssueCategories =
+        { "None", "Structural", "Barrier/Fencing", "Water Quality", "Temperature/Climate",
+          "Electrical", "Sanitation", "Vegetation/Hazard", "Other" };
+
+    // Roles allowed to approve and receive feed restock orders (Animals > Feed)
+    public const string FeedOrderRoles = "Admin,SuperUser,DBA";
+
+    public static bool CanManageFeedOrders(ClaimsPrincipal user) =>
+        FeedOrderRoles.Split(',').Any(user.IsInRole);
 
     // Dropdown choices, so staff pick from a list instead of typing
     public static readonly string[] Genders = { "Male", "Female", "Unknown" };
 
     public static readonly string[] HealthStatuses =
-        { "Healthy", "Under Observation", "Recovering", "Recovered", "Quarantine", "Quarantined", "Critical" };
+        { "Healthy", "Under Observation", "Recovering", "Recovered", "Quarantined" };
 
     public static readonly string[] AcquisitionTypes =
-        { "Born at Zoo", "Transfer", "Rescue", "Loan", "Purchase" };
+        { "Born at Zoo", "Transfer In", "Rescue", "Purchase" };
 
     // Badge color for a health status: green = fine, yellow = watch, red = urgent
     public static string HealthBadgeClass(string? status) => status switch
     {
         "Healthy" or "Recovered" => "bg-success",
-        "Quarantine" or "Quarantined" or "Critical" => "bg-danger",
+        "Quarantined" => "bg-danger",
         null or "" => "bg-secondary",
         _ => "bg-warning text-dark"
     };

@@ -16,6 +16,7 @@ public class AttractionsModel : PageModel
 
     public List<AttractionRow> Rows { get; set; } = new();
     public bool CanManage => SalesOptions.CanManage(User);
+    public bool CanBookEncounter => SalesOptions.CanBookEncounter(User);
 
     public async Task OnGetAsync()
     {

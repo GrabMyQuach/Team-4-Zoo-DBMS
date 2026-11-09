@@ -59,6 +59,14 @@
         {
             <div class="small mt-1">Reason: @q.Reason</div>
         }
+        @if (Model.CanRecordHealth)
+        {
+            <form method="post" asp-page-handler="ReleaseQuarantine" asp-route-id="@a.AnimalId" class="mt-2"
+                  onsubmit="return confirm('Release this animal from quarantine? It will go back on public encounters.');">
+                <input type="hidden" name="quarantineId" value="@q.Id" />
+                <button type="submit" class="btn btn-sm btn-light rounded-pill px-3">Release from Quarantine</button>
+            </form>
+        }
     </div>
 }
 @if (a.NeedsRelocation)
@@ -207,7 +215,13 @@
     <div class="col-lg-6">
         <div class="card h-100">
             <div class="card-body p-4">
-                <h2 class="h5 section-heading">Feeding</h2>
+                <div class="d-flex justify-content-between align-items-center">
+                    <h2 class="h5 section-heading">Feeding</h2>
+                    @if (Model.CanLogFeeding && Model.FeedingSchedule.Count > 0)
+                    {
+                        <a href="/Animals/FeedingNew/@Model.Animal.AnimalId" class="btn btn-sm btn-primary rounded-pill px-3">Log Feeding</a>
+                    }
+                </div>
                 @if (Model.FeedingSchedule.Count > 0)
                 {
                     <ul class="list-unstyled mb-0">
@@ -313,7 +327,13 @@
     <div class="col-12">
         <div class="card">
             <div class="card-body p-4">
-                <h2 class="h5 section-heading">Health History</h2>
+                <div class="d-flex justify-content-between align-items-center">
+    <h2 class="h5 section-heading">Health History</h2>
+    @if (Model.CanRecordHealth)
+    {
+        <a href="/Animals/HealthNew/@Model.Animal.AnimalId" class="btn btn-sm btn-primary rounded-pill px-3">Record Exam</a>
+    }
+</div>
                 @if (Model.HealthHistory.Count == 0)
                 {
                     <p class="text-muted mb-0">No vet records yet.</p>
@@ -331,6 +351,10 @@
                                     <th>Treatment</th>
                                     <th>Weight</th>
                                     <th>Vet</th>
+                                    @if (Model.CanRecordHealth)
+                                    {
+                                        <th></th>
+                                    }
                                 </tr>
                             </thead>
                             <tbody>
@@ -350,6 +374,16 @@
                                         <td>@(h.Treatment ?? "—")</td>
                                         <td>@(h.WeightKg != null ? h.WeightKg.Value.ToString("0.#") + " kg" : "—")</td>
                                         <td>@(h.Vet ?? "—")</td>
+                                        @if (Model.CanRecordHealth)
+                                        {
+                                            <td class="text-end">
+                                                <form method="post" asp-page-handler="DeleteHealth" asp-route-id="@Model.Animal.AnimalId" class="d-inline"
+                                                      onsubmit="return confirm('@(h.IsContagious ? "Delete this record? The quarantine and care tasks it started will be removed too." : "Delete this health record? This cannot be undone.")');">
+                                                    <input type="hidden" name="recordId" value="@h.Id" />
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3">Delete</button>
+                                                </form>
+                                            </td>
+                                        }
                                     </tr>
                                 }
                             </tbody>

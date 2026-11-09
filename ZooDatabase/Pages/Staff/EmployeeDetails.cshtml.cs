@@ -21,6 +21,7 @@ public class EmployeeDetailsModel : PageModel
 
     public EmployeeInfo Emp { get; set; } = new();
     public bool CanEdit => StaffOptions.CanEdit(User);
+    public bool CanMarkAbsent => StaffOptions.CanMarkAbsent(User);
     public bool CanSeePrivate => StaffOptions.CanSeePrivate(User);
 
     public decimal HoursLast30 { get; set; }
@@ -103,7 +104,7 @@ public class EmployeeDetailsModel : PageModel
 
         // Recent and upcoming shifts (last 14 days through next 7)
         await using (var cmd = new MySqlCommand(@"
-            SELECT s.Shift_Date, s.Start_Time, s.End_Time, s.Hours, s.Status, s.Absence_Reason, d.Department_Name
+            SELECT s.Shift_Date, s.Start_Time, s.End_Time, s.Hours, s.Status, s.Absence_Reason, d.Department_Name, s.Shift_ID
             FROM Employee_Shift s
             LEFT JOIN Department d ON d.Department_ID = s.Department_ID
             WHERE s.Employee_ID = @id
@@ -122,7 +123,8 @@ public class EmployeeDetailsModel : PageModel
                     Hours = r.IsDBNull(3) ? 0 : r.GetDecimal(3),
                     Status = r.GetString(4),
                     Reason = r.IsDBNull(5) ? null : r.GetString(5),
-                    Department = r.IsDBNull(6) ? null : r.GetString(6)
+                    Department = r.IsDBNull(6) ? null : r.GetString(6),
+                    Id = r.GetInt32(7)
                 });
             }
         }
@@ -232,8 +234,80 @@ public class EmployeeDetailsModel : PageModel
         public string? Login { get; set; }
     }
 
+    // "Mark absent" on a scheduled shift. Setting Status = 'Absent' fires trg_shift_absent_update,
+    // which calls sp_reassign_for_absence: that day's open tasks move to the least-busy coworker
+    // on shift in the same department, and the coworker and the department manager are notified.
+    public async Task<IActionResult> OnPostAbsentAsync(int id, int shiftId, string? reason)
+    {
+        if (!CanMarkAbsent) return Forbid();
+        reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+        if (reason?.Length > 100) reason = reason[..100];
+
+        await using var conn = new MySqlConnection(_config.GetConnectionString("ZooDb"));
+        await conn.OpenAsync();
+
+        // The open tasks due that day: these are what the procedure hands over
+        DateTime shiftDate;
+        await using (var cmd = new MySqlCommand(
+            "SELECT Shift_Date FROM Employee_Shift WHERE Shift_ID = @shift AND Employee_ID = @id AND Status = 'Scheduled'", conn))
+        {
+            cmd.Parameters.AddWithValue("@shift", shiftId);
+            cmd.Parameters.AddWithValue("@id", id);
+            if (await cmd.ExecuteScalarAsync() is not DateTime d)
+            {
+                TempData["Success"] = "That shift can't be marked absent (it isn't a scheduled shift anymore).";
+                return Redirect($"/Staff/EmployeeDetails/{id}");
+            }
+            shiftDate = d;
+        }
+
+        var taskIds = new List<int>();
+        await using (var cmd = new MySqlCommand(@"
+            SELECT Task_ID FROM Care_Task
+            WHERE Assigned_Employee_ID = @id AND Status IN ('Open', 'In Progress')
+              AND (Due_At IS NULL OR DATE(Due_At) <= @date)", conn))
+        {
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.Parameters.AddWithValue("@date", shiftDate);
+            await using var r = await cmd.ExecuteReaderAsync();
+            while (await r.ReadAsync()) taskIds.Add(r.GetInt32(0));
+        }
+
+        await using (var cmd = new MySqlCommand(@"
+            UPDATE Employee_Shift SET Status = 'Absent', Absence_Reason = @reason
+            WHERE Shift_ID = @shift AND Employee_ID = @id AND Status = 'Scheduled'", conn))
+        {
+            cmd.Parameters.AddWithValue("@reason", (object?)reason ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@shift", shiftId);
+            cmd.Parameters.AddWithValue("@id", id);
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        // Read back who has those tasks now
+        string message = $"Marked absent for {shiftDate:ddd, MMM d}.";
+        if (taskIds.Count == 0)
+        {
+            message += " They had no open tasks due that day, so nothing needed to be handed over.";
+        }
+        else
+        {
+            await using var cmd = new MySqlCommand($@"
+                SELECT CONCAT(e.First_Name, ' ', e.Last_Name)
+                FROM Care_Task t LEFT JOIN Employee e ON e.Employee_ID = t.Assigned_Employee_ID
+                WHERE t.Task_ID IN ({string.Join(",", taskIds)})
+                LIMIT 1", conn);
+            var cover = await cmd.ExecuteScalarAsync() as string;
+            message += cover != null
+                ? $" {taskIds.Count} open task(s) were handed to {cover}, who is on shift that day. Their manager was notified."
+                : $" {taskIds.Count} open task(s) are now UNASSIGNED because nobody else in the department is on shift that day. Their manager was notified.";
+        }
+        TempData["Success"] = message;
+        return Redirect($"/Staff/EmployeeDetails/{id}");
+    }
+
     public class ShiftRow
     {
+        public int Id { get; set; }
         public DateTime Date { get; set; }
         public TimeSpan Start { get; set; }
         public TimeSpan End { get; set; }

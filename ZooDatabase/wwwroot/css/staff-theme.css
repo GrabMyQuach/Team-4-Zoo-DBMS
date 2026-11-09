@@ -1,0 +1,234 @@
+/* Staff side theme: makes the logged-in app match the public website
+   (same fonts, greens, rounded buttons). Loaded after site.css, so it wins. */
+
+:root {
+    --z-green: #1F5A43;
+    --z-green-dark: #123B2C;
+    --z-green-soft: #E4EEE8;
+    --z-sand: #F3F1EC;
+    --z-line: #E3DED3;
+    --z-ink: #1B2A22;
+    --z-muted: #4E5B53;
+    --z-accent: #F2B544;
+    --z-warn: #9A6200;
+    --z-bad: #A8261A;
+    --z-serif: "Fraunces", Georgia, serif;
+    --z-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+body {
+    font-family: var(--z-sans);
+    background-color: var(--z-sand);
+    color: var(--z-ink);
+}
+
+a { color: var(--z-green); }
+a:hover { color: var(--z-green-dark); }
+
+/* Headings use the same serif as the public site */
+main h1, main h1.h2, main h1.h3,
+.section-heading, .module-title, .report-card-title, .module-card-title,
+.card-title, main h2.h4, main h2.h5 {
+    font-family: var(--z-serif);
+    color: var(--z-green-dark);
+    font-weight: 700;
+}
+main h1, main h1.h2 { font-size: 2.4rem; }
+.text-muted { color: var(--z-muted) !important; }
+
+/* ===== Top bar ===== */
+header .navbar.staff-bar {
+    background: var(--z-green);
+    border: none;
+    padding-top: 14px;
+    padding-bottom: 14px;
+}
+.staff-brand, header .navbar-brand.staff-brand {
+    font-family: var(--z-serif);
+    font-weight: 700;
+    font-size: 1.9rem;
+    color: #FFFFFF !important;
+    text-decoration: none;
+}
+.staff-tag {
+    font-family: var(--z-sans);
+    font-size: .85rem;
+    font-weight: 600;
+    color: #D6E2D8;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+.staff-link, .staff-user {
+    color: #FFFFFF;
+    text-decoration: none;
+    font-weight: 600;
+}
+.staff-link:hover, .staff-user:hover { color: #FFFFFF; text-decoration: underline; }
+.staff-role {
+    background: var(--z-accent);
+    color: var(--z-ink);
+    font-size: .75rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 999px;
+    margin-left: 4px;
+}
+header .btn.staff-logout {
+    color: #FFFFFF;
+    border: 1px solid #8DB3A1;
+    border-radius: 999px;
+    padding: 6px 18px;
+    font-weight: 600;
+}
+header .btn.staff-logout:hover { background: var(--z-green-dark); color: #FFFFFF; }
+
+/* ===== Side menus ===== */
+.module-sidebar {
+    background: #FFFFFF;
+    border: none;
+    border-radius: 18px;
+    padding: 18px;
+}
+.module-title { font-size: 1.25rem; margin-bottom: 12px; }
+.module-sidebar .nav-link {
+    color: var(--z-ink);
+    font-weight: 500;
+    border-radius: 12px;
+    padding: 10px 14px;
+}
+.module-sidebar .nav-link:hover { background: var(--z-green-soft); color: var(--z-ink); }
+.module-sidebar .nav-link.active { background: var(--z-green); color: #FFFFFF; font-weight: 600; }
+.main-menu .nav-link.parent-active { color: var(--z-green); }
+.main-menu .sub-nav { border-left-color: var(--z-line); }
+.back-link { color: var(--z-green); font-weight: 600; }
+
+/* ===== Buttons ===== */
+.btn { border-radius: 999px; font-weight: 600; }
+.btn-primary, .btn-success {
+    background-color: var(--z-green);
+    border-color: var(--z-green);
+    color: #FFFFFF;
+}
+.btn-primary:hover, .btn-primary:focus, .btn-success:hover, .btn-success:focus {
+    background-color: var(--z-green-dark);
+    border-color: var(--z-green-dark);
+    color: #FFFFFF;
+}
+.btn-outline-primary, .btn-outline-success {
+    color: var(--z-green);
+    border-color: var(--z-green);
+}
+.btn-outline-primary:hover, .btn-outline-success:hover {
+    background-color: var(--z-green);
+    border-color: var(--z-green);
+    color: #FFFFFF;
+}
+.btn-warning { background-color: var(--z-accent); border-color: var(--z-accent); color: var(--z-ink); }
+.btn:focus-visible, .form-control:focus, .form-select:focus, .form-check-input:focus {
+    box-shadow: 0 0 0 3px rgba(242, 181, 68, .55);
+    border-color: var(--z-green);
+}
+
+/* ===== Cards ===== */
+.card {
+    border: none;
+    border-radius: 18px;
+    background: #FFFFFF;
+}
+.card-header {
+    background: #FFFFFF;
+    border-bottom: 1px solid var(--z-line);
+    font-family: var(--z-serif);
+    font-weight: 700;
+    color: var(--z-green-dark);
+}
+.module-card, .report-card {
+    border: none;
+    border-radius: 18px;
+}
+.module-card-title, .report-card-title { color: var(--z-green); }
+
+/* Dashboard tiles: no colored left stripe; a small colored dot shows the status instead */
+.dash-tile {
+    border: none;
+    border-radius: 18px;
+    padding: 20px 22px;
+}
+.dash-tile-label { color: var(--z-muted); font-weight: 600; }
+.dash-tile-label::before {
+    content: "";
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--z-green);
+    margin-right: 8px;
+    vertical-align: middle;
+}
+.tone-warn .dash-tile-label::before { background: #D89B1C; }
+.tone-bad .dash-tile-label::before { background: var(--z-bad); }
+.dash-tile-value { font-family: var(--z-serif); font-size: 2.4rem; color: var(--z-ink); }
+.tone-warn .dash-tile-value { color: var(--z-warn); }
+.tone-bad .dash-tile-value { color: var(--z-bad); }
+.dash-tile-detail { color: var(--z-muted); }
+
+.stat-card .stat-value { font-family: var(--z-serif); color: var(--z-green-dark); }
+.stat-card .stat-label { color: var(--z-muted); font-weight: 600; }
+
+/* ===== Tables ===== */
+.table { --bs-table-bg: transparent; color: var(--z-ink); }
+.table > thead th, .table-light th, thead.table-light th {
+    background: transparent !important;
+    color: var(--z-muted);
+    font-size: .78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    border-bottom: 2px solid var(--z-line);
+}
+.table > tbody td { border-color: #F0EADC; padding-top: .7rem; padding-bottom: .7rem; }
+.table-hover > tbody > tr:hover > * { --bs-table-bg-state: var(--z-green-soft); }
+
+/* ===== Badges and alerts ===== */
+.badge { border-radius: 999px; font-weight: 600; padding: .4em .8em; }
+.badge.bg-success { background-color: var(--z-green) !important; }
+.badge.bg-warning { background-color: var(--z-accent) !important; color: var(--z-ink) !important; }
+.alert { border: none; border-radius: 14px; }
+.alert-success { background: var(--z-green-soft); color: var(--z-green-dark); }
+
+/* ===== Forms ===== */
+.form-control, .form-select { border-radius: 12px; border: 2px solid var(--z-line); }
+.form-label { font-weight: 600; }
+
+/* ===== Mini bars in reports ===== */
+.mini-bar { background: var(--z-green-soft); }
+.mini-bar-fill { background: var(--z-green); }
+
+/* ===== Footer ===== */
+footer.footer { color: var(--z-muted); border-top-color: var(--z-line) !important; }
+footer.footer a { color: var(--z-green); }
+
+@media (max-width: 767.98px) {
+    .staff-brand, header .navbar-brand.staff-brand { font-size: 1.5rem; }
+    main h1, main h1.h2 { font-size: 1.8rem; }
+}
+
+@media print {
+    header .navbar.staff-bar { display: none; }
+    body { background: #FFFFFF !important; }
+}
+
+/* ===== Animal photos on staff pages ===== */
+.animal-thumb { width: 44px; height: 44px; border-radius: 12px; object-fit: cover; flex: none; }
+.animal-thumb--empty { display: inline-block; background: var(--z-green-soft); }
+.animal-hero { display: block; width: 100%; max-height: 340px; object-fit: cover; border-radius: 18px; }
+
+/* ===== Run-on-demand reports ===== */
+.report-view-help { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 4px 24px; font-size: .9rem; color: var(--z-muted); }
+.report-view-help strong { color: var(--z-ink); }
+.drill-link { font-weight: 700; color: var(--z-green); text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
+.drill-link:hover { text-decoration-style: solid; }
+.report-table tr.row-warn > * { --bs-table-bg: #FFF4CE; }
+.report-table tr.row-bad > * { --bs-table-bg: #FDE2E1; }
+.report-table tfoot tr.report-total td { font-weight: 700; border-top: 2px solid var(--z-line); border-bottom: none; }
+@media print { .drill-link { text-decoration: none; color: inherit; } }
