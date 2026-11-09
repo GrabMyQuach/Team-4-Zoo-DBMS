@@ -18,7 +18,7 @@ public class ModuleModel : PageModel
             System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
 
         // ReadOnly cannot access internal staff or finance modules.
-        if (role == "ReadOnly" &&
+        if (role == "Customer" &&
             (m.Key == "Staff" || m.Key == "Finance"))
         {
             return Forbid();
@@ -37,7 +37,12 @@ public class ModuleModel : PageModel
             return Forbid();
         }
 
-        // Redirect to the first section when no section is provided.
+        
+        // Customers should go directly to Buy Tickets.
+        if (role == "Customer" && m.Key == "Tickets")
+        {
+            return Redirect("/Tickets/BuyTickets");
+        }
         if (section == null)
         {
             return Redirect($"/{m.Key}/{m.Sections[0].Slug}");

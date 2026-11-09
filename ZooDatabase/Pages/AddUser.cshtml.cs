@@ -15,12 +15,12 @@ public class AddUserModel : PageModel
         _config = config;
     }
 
-    public static readonly string[] Roles = { "ReadOnly", "Admin", "SuperUser", "DBA" };
+    public static readonly string[] Roles = { "Customer", "Admin", "SuperUser", "DBA" };
 
     [BindProperty] public string Username { get; set; } = "";
     [BindProperty] public string Password { get; set; } = "";
     [BindProperty] public string ConfirmPassword { get; set; } = "";
-    [BindProperty] public string Role { get; set; } = "ReadOnly";
+    [BindProperty] public string Role { get; set; } = "Customer";
 
     public string? ErrorMessage { get; set; }
 
