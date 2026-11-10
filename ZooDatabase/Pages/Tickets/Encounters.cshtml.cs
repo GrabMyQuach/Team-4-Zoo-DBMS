@@ -11,8 +11,9 @@ namespace ZooDatabase.Pages.Tickets;
 //   trg_encounter_guard       (BEFORE INSERT) refuses a booking for an animal that isn't cleared.
 //                             Booking happens on EncounterNew, so the guard always runs.
 //   trg_contagious_diagnosis  cancels an animal's upcoming encounters when it is quarantined.
-//   trg_inspection_result     flags animals in an unsafe enclosure (Needs_Relocation) but leaves
-//                             their bookings alone, so this page highlights those for staff to cancel.
+//   trg_inspection_result     cancels the upcoming encounters of animals in an enclosure closed by a
+//                             critical inspection. Anything still booked with an animal that isn't
+//                             cleared shows under "Needs attention".
 // This page only changes Status / Guests_Attended / Cancel_Reason, which no trigger watches.
 public class EncountersModel : PageModel
 {

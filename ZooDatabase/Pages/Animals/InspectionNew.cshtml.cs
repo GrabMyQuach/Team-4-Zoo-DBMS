@@ -11,7 +11,8 @@ namespace ZooDatabase.Pages.Animals;
 //
 // Saving inserts a row into Habitat_Inspection, and trg_inspection_result runs automatically:
 //   Critical -> emergency repair request, enclosure closed, every animal flagged to move,
-//               a relocation task per animal for its keeper, keepers alerted
+//               a relocation task per animal for its keeper, upcoming public encounters
+//               cancelled (handlers told), keepers alerted
 //   Pass     -> if the enclosure was closed and its emergency repairs are done:
 //               enclosure reopened, relocation tasks cancelled, re-inspection task completed
 // This page reports what it did.
@@ -72,6 +73,9 @@ public class InspectionNewModel : PageModel
         string statusBefore = EnclosureStatus;
         try
         {
+            // Booked encounters with this enclosure's animals, so we can say how many the trigger cancelled
+            long encountersBefore = await ScheduledEncountersAsync(conn);
+
             long inspectionId;
             await using (var cmd = new MySqlCommand(@"
                 INSERT INTO Habitat_Inspection (Enclosure_ID, Inspector_Employee_ID, Inspection_Date, Result, Issue_Category, Findings)
@@ -87,7 +91,8 @@ public class InspectionNewModel : PageModel
                 inspectionId = cmd.LastInsertedId;
             }
 
-            TempData["Success"] = await DescribeResultAsync(conn, inspectionId, statusBefore);
+            TempData["Success"] = await DescribeResultAsync(conn, inspectionId, statusBefore,
+                                                            encountersBefore - await ScheduledEncountersAsync(conn));
             return Redirect($"/Animals/EnclosureDetails/{Id}");
         }
         catch (MySqlException ex)
@@ -98,7 +103,16 @@ public class InspectionNewModel : PageModel
     }
 
     // Read back what the trigger did so staff can see it
-    private async Task<string> DescribeResultAsync(MySqlConnection conn, long inspectionId, string statusBefore)
+    private async Task<long> ScheduledEncountersAsync(MySqlConnection conn)
+    {
+        await using var cmd = new MySqlCommand(@"
+            SELECT COUNT(*) FROM Animal_Encounter ae JOIN Animal a ON a.Animal_ID = ae.Animal_ID
+            WHERE a.Enclosure_ID = @id AND a.Is_Active = 1 AND ae.Status = 'Scheduled' AND ae.Scheduled_Start >= NOW()", conn);
+        cmd.Parameters.AddWithValue("@id", Id);
+        return Convert.ToInt64(await cmd.ExecuteScalarAsync());
+    }
+
+    private async Task<string> DescribeResultAsync(MySqlConnection conn, long inspectionId, string statusBefore, long encountersCancelled)
     {
         var parts = new List<string> { $"{Input.Result} inspection recorded for {EnclosureName}." };
 
@@ -121,6 +135,7 @@ public class InspectionNewModel : PageModel
             if (!r.IsDBNull(0)) parts.Add($"Emergency repair request #{r.GetInt64(0)} was created.");
             long tasks = Convert.ToInt64(r.GetValue(1));
             if (tasks > 0) parts.Add($"{tasks} animal(s) need to be moved; a relocation task was created for each one's keeper.");
+            if (encountersCancelled > 0) parts.Add($"{encountersCancelled} upcoming public encounter(s) were cancelled and their handlers notified.");
         }
         else if (Input.Result == "Pass" && statusBefore == "Closed")
         {

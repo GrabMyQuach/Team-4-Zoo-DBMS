@@ -41,6 +41,7 @@ public class EncountersModel : RunnableReport
     // Quarantine cancellations are written by the trigger as "Quarantine: <disease>"
     private const string ReasonGroup = @"
         CASE WHEN ae.Cancel_Reason LIKE 'Quarantine:%' THEN 'Animal quarantined (automatic)'
+             WHEN ae.Cancel_Reason LIKE 'Enclosure closed:%' THEN 'Enclosure closed for safety (automatic)'
              WHEN NULLIF(TRIM(ae.Cancel_Reason), '') IS NULL THEN 'No reason given'
              ELSE TRIM(ae.Cancel_Reason) END";
 
@@ -169,10 +170,11 @@ public class EncountersModel : RunnableReport
             t.Rows.Add(R(new[]
             {
                 T(x.Reason), N(x.Count, Drill("list", "c:" + x.Reason, "cancelled")), N(x.Animals), N(x.Places), PctCell(Pct(x.Count, total))
-            }, x.Reason.StartsWith("Animal quarantined") ? "warn" : null));
+            }, x.Reason.EndsWith("(automatic)") ? "warn" : null));
         if (rows.Count > 0)
             t.Total = R(new[] { T("Total"), N(total, Drill("list", "all", "cancelled")), T(""), N(rows.Sum(x => x.Places)), PctCell(100) });
-        t.Note = "Yellow: cancelled automatically by the contagious-diagnosis trigger when the animal went into quarantine.";
+        t.Note = "Yellow: cancelled automatically by a trigger: the contagious-diagnosis trigger (animal quarantined) "
+               + "or the inspection trigger (enclosure closed after a critical inspection).";
         return t;
     }
 
@@ -230,7 +232,7 @@ public class EncountersModel : RunnableReport
     protected override async Task AnalyzeAsync(MySqlConnection conn)
     {
         var (n, p) = await CompareAsync(() => Cmd(conn, $@"
-            SELECT {Counts}, COALESCE(SUM(ae.Status = 'Cancelled' AND ae.Cancel_Reason LIKE 'Quarantine:%'), 0),
+            SELECT {Counts}, COALESCE(SUM(ae.Status = 'Cancelled' AND (ae.Cancel_Reason LIKE 'Quarantine:%' OR ae.Cancel_Reason LIKE 'Enclosure closed:%')), 0),
                    COALESCE(SUM(CASE WHEN ae.Status = 'Cancelled' THEN ae.Max_Guests END), 0)
             {EncFrom} WHERE {Where}"));
         // n: 0 all, 1 held, 2 cancelled, 3 guests, 4 places (counted), 5 guests (counted), 6 quarantine cancels, 7 places lost
@@ -258,8 +260,8 @@ public class EncountersModel : RunnableReport
             Findings.Add(new Finding($"{cancelRate:0.#}% of scheduled encounters were cancelled ({n[2]:N0} of {n[0]:N0}), losing {Plural(n[7], "guest place", "guest places")}.",
                 cancelRate >= 15 ? "bad" : "info"));
             if (n[6] > 0)
-                Findings.Add(new Finding($"{n[6]:N0} of those ({Rate(n[6], n[2]):0.#}%) were cancelled automatically by the contagious-diagnosis trigger when the animal went into quarantine. "
-                    + "Without it, sick animals would still have been booked to meet the public.", "info"));
+                Findings.Add(new Finding($"{n[6]:N0} of those ({Rate(n[6], n[2]):0.#}%) were cancelled automatically by triggers, because the animal was quarantined "
+                    + "or its enclosure failed a safety inspection. Without them, those animals would still have been booked to meet the public.", "info"));
         }
 
         if (AnimalId == null)
