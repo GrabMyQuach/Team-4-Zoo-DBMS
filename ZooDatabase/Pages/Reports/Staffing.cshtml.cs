@@ -62,6 +62,65 @@ public class StaffingModel : RunnableReport
         return cmd;
     }
 
+    // ===== Key findings =====
+    // Target: absences under 5% of scheduled shifts.
+    protected override async Task AnalyzeAsync(MySqlConnection conn)
+    {
+        var (n, p) = await CompareAsync(() => Cmd(conn, $@"
+            SELECT {WorkedHours}, {WorkedCost}, SUM(s.Status = 'Absent'), COUNT(*),
+                   (SELECT COUNT(*) FROM (
+                        SELECT s.Employee_ID FROM Employee_Shift s JOIN Employee e ON e.Employee_ID = s.Employee_ID
+                        WHERE {ShiftWhere} AND s.Status = 'Worked'
+                        GROUP BY s.Employee_ID, YEARWEEK(s.Shift_Date, 1) HAVING SUM({PaidHours}) > 40) ot)
+            {ShiftFrom} WHERE {ShiftWhere}"));
+        decimal absNow = Rate(n[2], n[3]), absPrev = Rate(p[2], p[3]);
+        Kpis.Add(new Kpi("Paid hours", Math.Round(n[0]), Math.Round(p[0]), HigherIsBetter: null));
+        Kpis.Add(new Kpi("Labor cost", n[1], p[1], "money", HigherIsBetter: null));
+        Kpis.Add(new Kpi("Absence rate", absNow, p[3] == 0 ? null : absPrev, "pct", HigherIsBetter: false));
+        Kpis.Add(new Kpi("Overtime weeks", n[4], p[4], HigherIsBetter: false));
+
+        if (n[3] == 0)
+        {
+            Findings.Add(new Finding("No shifts were recorded in this period.", "bad"));
+            return;
+        }
+
+        Findings.Add(new Finding(
+            $"{absNow:0.#}% of shifts were missed" + (p[3] > 0 ? Versus(absNow, absPrev, v => v.ToString("0.#") + "%") : "")
+            + (absNow < 5 ? ". That's within the 5% target." : ". That's above the 5% target."),
+            absNow < 5 ? "good" : "bad"));
+
+        if (DepartmentId == null && EmployeeId == null)
+        {
+            await using var cmd = Cmd(conn, $@"
+                SELECT d.Department_Name, SUM(s.Status = 'Absent'), COUNT(*)
+                {ShiftFrom} JOIN Department d ON d.Department_ID = {ShiftDept}
+                WHERE {ShiftWhere}
+                GROUP BY d.Department_ID, d.Department_Name HAVING COUNT(*) >= 10 AND SUM(s.Status = 'Absent') > 0
+                ORDER BY SUM(s.Status = 'Absent') / COUNT(*) DESC LIMIT 1");
+            foreach (var r in await RowsAsync(cmd))
+                Findings.Add(new Finding($"{r[0]} had the highest absence rate: {Rate(Convert.ToDecimal(r[1]), Convert.ToDecimal(r[2])):0.#}% ({Convert.ToInt32(r[1])} of {Convert.ToInt32(r[2])} shifts).", "bad"));
+        }
+
+        await using (var cmd = Cmd(conn, $@"
+            SELECT COALESCE(NULLIF(TRIM(s.Absence_Reason), ''), 'No reason given'), COUNT(*)
+            {ShiftFrom} WHERE {ShiftWhere} AND s.Status = 'Absent' GROUP BY 1 ORDER BY 2 DESC LIMIT 1"))
+            foreach (var r in await RowsAsync(cmd))
+                Findings.Add(new Finding($"Most common reason for missing a shift: {r[0]} ({Plural(Convert.ToInt32(r[1]), "time", "times")}).", "info"));
+
+        if (n[4] > 0)
+            Findings.Add(new Finding($"{Plural(n[4], "employee-week went", "employee-weeks went")} over 40 paid hours. See Overtime.", "bad"));
+
+        await using (var cmd = Cmd(conn, @"
+            SELECT COUNT(*) FROM Care_Task WHERE Status IN ('Open', 'In Progress') AND Due_At < @now"))
+        {
+            var late = (await FirstRowAsync(cmd))[0];
+            Findings.Add(late > 0
+                ? new Finding($"{Plural(late, "care task is", "care tasks are")} past due right now, a sign of too few people on shift.", "bad")
+                : new Finding("No care tasks are past due right now.", "good"));
+        }
+    }
+
     protected override Task<ReportTable> BuildAsync(MySqlConnection conn) => CurrentView.Key switch
     {
         "employee" => EmployeesAsync(conn),

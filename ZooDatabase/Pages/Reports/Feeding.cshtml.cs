@@ -90,6 +90,71 @@ public class FeedingModel : RunnableReport
         return cmd;
     }
 
+    // ===== Key findings =====
+    // Target: at least 95% of logged feedings completed.
+    protected override async Task AnalyzeAsync(MySqlConnection conn)
+    {
+        var (n, p) = await CompareAsync(() => Cmd(conn,
+            $"SELECT COUNT(*), SUM(fl.Status = 'Completed'), SUM(fl.Status IN ('Refused', 'Missed')) {LogFrom} WHERE {LogWhere}"));
+        decimal rateNow = Rate(n[1], n[0]), ratePrev = Rate(p[1], p[0]);
+        Kpis.Add(new Kpi("Feedings logged", n[0], p[0], HigherIsBetter: null));
+        Kpis.Add(new Kpi("Completion rate", rateNow, p[0] == 0 ? null : ratePrev, "pct"));
+        Kpis.Add(new Kpi("Refused or missed", n[2], p[2], HigherIsBetter: false));
+
+        if (n[0] == 0)
+        {
+            Findings.Add(new Finding("No feedings were logged in this period.", "bad"));
+            return;
+        }
+
+        Findings.Add(new Finding(
+            $"{rateNow:0.#}% of feedings were completed" + (p[0] > 0 ? Versus(rateNow, ratePrev, v => v.ToString("0.#") + "%") : "")
+            + (rateNow >= 95 ? ". That meets the 95% target." : ". That's below the 95% target."),
+            rateNow >= 95 ? "good" : "bad"));
+
+        if (EnclosureId == null && AnimalId == null)
+        {
+            await using var cmd = Cmd(conn, $@"
+                SELECT e.Enclosure_Name, COUNT(*), SUM(fl.Status = 'Completed')
+                {LogFrom} JOIN Enclosure e ON e.Enclosure_ID = a.Enclosure_ID
+                WHERE {LogWhere}
+                GROUP BY e.Enclosure_ID, e.Enclosure_Name HAVING COUNT(*) >= 10
+                ORDER BY SUM(fl.Status = 'Completed') / COUNT(*), COUNT(*) DESC LIMIT 1");
+            foreach (var r in await RowsAsync(cmd))
+            {
+                var rate = Rate(Convert.ToDecimal(r[2]), Convert.ToDecimal(r[1]));
+                Findings.Add(new Finding($"{r[0]} had the lowest completion rate, at {rate:0.#}% of {Convert.ToInt32(r[1]):N0} feedings.",
+                    rate < 90 ? "bad" : "info"));
+            }
+        }
+
+        await using (var cmd = Cmd(conn, $@"
+            SELECT COUNT(*) FROM (
+                SELECT a.Animal_ID {LogFrom}
+                WHERE fl.Feeding_Date >= @recent AND fl.Feeding_Date < @to {FilterSql()}
+                GROUP BY a.Animal_ID HAVING SUM(fl.Status IN ('Refused', 'Missed')) >= 2) x"))
+        {
+            var k = (await FirstRowAsync(cmd))[0];
+            Findings.Add(k > 0
+                ? new Finding($"{Plural(k, "animal", "animals")} refused or missed 2 or more meals in the last 7 days of the range. See Appetite concerns.", "bad")
+                : new Finding("No animal refused or missed 2 or more meals in the last 7 days of the range.", "good"));
+        }
+
+        await using (var cmd = Cmd(conn, @"
+            SELECT f.Feed_Name, f.Quantity_In_Stock / d.Daily
+            FROM Feed f
+            JOIN (SELECT fs.Feed_ID, SUM(fs.Quantity) AS Daily FROM Feeding_Schedule fs JOIN Animal a ON a.Animal_ID = fs.Animal_ID
+                  WHERE fs.Is_Active = 1 AND a.Is_Active = 1 GROUP BY fs.Feed_ID) d ON d.Feed_ID = f.Feed_ID
+            WHERE d.Daily > 0 AND COALESCE(f.Quantity_In_Stock, 0) / d.Daily < 7
+            ORDER BY 2"))
+        {
+            var low = await RowsAsync(cmd);
+            Findings.Add(low.Count > 0
+                ? new Finding("Running low today: " + string.Join(", ", low.Select(r => $"{r[0]} ({Convert.ToDecimal(r[1] ?? 0m):0.#} days left)")) + ".", "bad")
+                : new Finding("Every feed in use has at least a week of stock today.", "good"));
+        }
+    }
+
     protected override Task<ReportTable> BuildAsync(MySqlConnection conn) => CurrentView.Key switch
     {
         "enclosure" => GroupedAsync(conn, "e", "e.Enclosure_ID", "e.Enclosure_Name", "JOIN Enclosure e ON e.Enclosure_ID = a.Enclosure_ID", "Enclosure"),

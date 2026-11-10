@@ -82,6 +82,45 @@ else
         Generated @DateTime.Now.ToString("MMM d, yyyy h:mm tt") by @User.Identity?.Name
     </div>
 
+    @if (Model.Kpis.Count > 0 || Model.Findings.Count > 0)
+    {
+        <div class="card mb-4 report-findings">
+            <div class="card-body">
+                <div class="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mb-3">
+                    <h2 class="h5 section-heading mb-0">Key findings</h2>
+                    <span class="text-muted small">@Model.DateRangeText, compared with @Model.PrevRangeText@(Model.FilterText == "" ? "" : " · " + Model.FilterText)</span>
+                </div>
+                @if (Model.Kpis.Count > 0)
+                {
+                    <div class="row g-3 mb-3">
+                        @foreach (var k in Model.Kpis)
+                        {
+                            <div class="col-6 col-lg-3">
+                                <div class="kpi-tile">
+                                    <div class="kpi-label">@k.Label</div>
+                                    <div class="kpi-value">@k.Show(k.Now)</div>
+                                    @if (k.ChangeText != null)
+                                    {
+                                        <div class="kpi-change kpi-@k.Tone">@k.Arrow @k.ChangeText <span class="text-muted">vs. @k.Show(k.Prev!.Value)</span></div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                @if (Model.Findings.Count > 0)
+                {
+                    <ul class="report-finding-list mb-0">
+                        @foreach (var f in Model.Findings)
+                        {
+                            <li class="finding-@f.Tone">@f.Text</li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    }
+
     <div class="card">
         <div class="card-body">
             <div class="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mb-3">

@@ -363,3 +363,18 @@ fieldset legend.form-label { font-size: 1rem; float: none; }
 .guide-card-body { padding: 18px 20px 20px; }
 .guide-card-title { font-family: var(--z-serif); font-weight: 700; font-size: 1.5rem; color: var(--z-green-dark); margin-bottom: 2px; }
 .guide-points { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 6px; }
+
+/* Reports: Key findings box */
+.report-findings { border-left: 4px solid var(--bs-primary, #1f6f5c); }
+.kpi-tile { border: 1px solid #dfe6e3; border-radius: .5rem; padding: .75rem 1rem; height: 100%; background: #fff; }
+.kpi-label { font-size: .8rem; font-weight: 600; color: #5a6b66; }
+.kpi-value { font-size: 1.6rem; font-weight: 700; line-height: 1.2; }
+.kpi-change { font-size: .8rem; font-weight: 600; }
+.kpi-good { color: #1e7b45; } .kpi-bad { color: #b42318; } .kpi-flat { color: #5a6b66; }
+.report-finding-list { list-style: none; padding-left: 0; }
+.report-finding-list li { padding: .35rem 0 .35rem 1.4rem; position: relative; border-top: 1px solid #eef2f0; }
+.report-finding-list li:first-child { border-top: 0; }
+.report-finding-list li::before { content: ""; position: absolute; left: .2rem; top: .8rem; width: .55rem; height: .55rem; border-radius: 50%; background: #8a9a95; }
+.report-finding-list li.finding-good::before { background: #1e7b45; }
+.report-finding-list li.finding-bad::before { background: #b42318; }
+@media print { .kpi-tile { break-inside: avoid; } }

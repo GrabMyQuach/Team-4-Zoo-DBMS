@@ -59,6 +59,70 @@ public class RevenueModel : RunnableReport
         return cmd;
     }
 
+    // ===== Key findings =====
+    protected override async Task AnalyzeAsync(MySqlConnection conn)
+    {
+        var (n, p) = await CompareAsync(() => Cmd(conn, $@"
+            SELECT (SELECT SUM(i.Quantity) {TicketFrom} WHERE {TicketWhere}),
+                   (SELECT SUM(i.Quantity * i.Unit_Price) {TicketFrom} WHERE {TicketWhere}),
+                   (SELECT SUM(s.Total_Amount) FROM Sale s WHERE {SaleWhere} AND s.Sale_Type = 'Food'),
+                   (SELECT SUM(s.Total_Amount) FROM Sale s WHERE {SaleWhere} AND s.Sale_Type <> 'Food'),
+                   (SELECT SUM(mt.Price) FROM Membership m JOIN Membership_Type mt ON mt.MembershipType_ID = m.MembershipType_ID
+                     WHERE m.Start_Date >= @from AND m.Start_Date < @to)"));
+        decimal Total(decimal[] x) => x[1] + x[2] + x[3] + x[4];
+        decimal PerVisitor(decimal[] x) => x[0] == 0 ? 0 : Math.Round((x[1] + x[2] + x[3]) / x[0], 2);
+        decimal total = Total(n), totalPrev = Total(p);
+        Kpis.Add(new Kpi("Revenue", total, totalPrev, "money"));
+        Kpis.Add(new Kpi("Visitors", n[0], p[0]));
+        Kpis.Add(new Kpi("Spend per visitor", PerVisitor(n), p[0] == 0 ? null : PerVisitor(p), "money"));
+        Kpis.Add(new Kpi("Memberships sold", n[4], p[4], "money"));
+
+        if (total == 0)
+        {
+            Findings.Add(new Finding("No revenue was recorded in this period.", "bad"));
+            return;
+        }
+
+        Findings.Add(new Finding($"Revenue was {total:C0}{Versus(total, totalPrev, v => v.ToString("C0"))}.",
+            total > totalPrev ? "good" : total < totalPrev ? "bad" : "info"));
+
+        var sources = new (string Name, decimal Amount)[] { ("Tickets", n[1]), ("Food", n[2]), ("Gift shops", n[3]), ("Memberships", n[4]) };
+        var top = sources.OrderByDescending(s => s.Amount).First();
+        Findings.Add(new Finding($"{top.Name} brought in the most money: {Rate(top.Amount, total):0.#}% of revenue ({top.Amount:C0})."));
+
+        string Move(string name, decimal now, decimal prev) =>
+            prev == 0 ? $"{name} had {now:C0} (none in the previous period)"
+            : $"{name} sales were {(now >= prev ? "up" : "down")} {Math.Abs(Math.Round(100 * (now - prev) / prev, 0))}%";
+        if (n[2] + p[2] + n[3] + p[3] > 0)
+            Findings.Add(new Finding($"{Move("Food", n[2], p[2])}; {Move("gift shop", n[3], p[3])}.",
+                n[2] + n[3] >= p[2] + p[3] ? "good" : "bad"));
+
+        await using (var cmd = Cmd(conn, $@"
+            SELECT DAYNAME(d.Day), AVG(d.Visitors) FROM (
+                SELECT ts.Visit_Date AS Day, SUM(i.Quantity) AS Visitors {TicketFrom} WHERE {TicketWhere} GROUP BY ts.Visit_Date) d
+            GROUP BY DAYOFWEEK(d.Day), DAYNAME(d.Day) ORDER BY AVG(d.Visitors) DESC LIMIT 1"))
+            foreach (var r in await RowsAsync(cmd))
+                Findings.Add(new Finding($"Busiest day of the week: {r[0]}, averaging {Convert.ToDecimal(r[1]):0} visitors. Schedule extra cashiers and guides then."));
+
+        await using (var cmd = Cmd(conn, $@"
+            SELECT COALESCE(pr.Product_Name, fi.FoodItem_Name), SUM(si.Quantity), SUM(si.Quantity * si.Unit_Price)
+            FROM Sale_Item si JOIN Sale s ON s.Sale_ID = si.Sale_ID
+            LEFT JOIN Product pr ON pr.Product_ID = si.Product_ID
+            LEFT JOIN Food_Item fi ON fi.FoodItem_ID = si.FoodItem_ID
+            WHERE {SaleWhere}
+            GROUP BY si.Product_ID, si.FoodItem_ID, 1 ORDER BY 3 DESC LIMIT 1"))
+            foreach (var r in await RowsAsync(cmd))
+                Findings.Add(new Finding($"Top seller: {r[0]}, {Convert.ToInt32(r[1]):N0} sold for {Convert.ToDecimal(r[2]):C0}."));
+
+        await using (var cmd = Cmd(conn, $@"
+            SELECT COALESCE(SUM(i.Quantity), 0) {TicketFrom}
+            WHERE ts.Visit_Date > @today AND ts.Visit_Date <= @today + INTERVAL 14 DAY"))
+        {
+            var ahead = (await FirstRowAsync(cmd))[0];
+            Findings.Add(new Finding($"{Plural(ahead, "ticket is", "tickets are")} already sold for visits in the next 14 days."));
+        }
+    }
+
     protected override Task<ReportTable> BuildAsync(MySqlConnection conn) => CurrentView.Key switch
     {
         "profit" => ProfitAsync(conn),

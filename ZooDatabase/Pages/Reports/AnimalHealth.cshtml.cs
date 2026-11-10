@@ -91,6 +91,77 @@ public class AnimalHealthModel : RunnableReport
         return cmd;
     }
 
+    // ===== Key findings =====
+    protected override async Task AnalyzeAsync(MySqlConnection conn)
+    {
+        var (n, p) = await CompareAsync(() => Cmd(conn, $@"
+            SELECT COUNT(*), SUM(h.Record_Type IN ('Illness', 'Injury')), SUM(h.Is_Contagious = 1), SUM(h.Severity IN ('High', 'Critical'))
+            FROM Health_Record h JOIN Animal a ON a.Animal_ID = h.Animal_ID
+            WHERE {HealthWhere()}"));
+        Kpis.Add(new Kpi("Vet records", n[0], p[0], HigherIsBetter: null));
+        Kpis.Add(new Kpi("Illness & injury", n[1], p[1], HigherIsBetter: false));
+        Kpis.Add(new Kpi("Contagious cases", n[2], p[2], HigherIsBetter: false));
+        Kpis.Add(new Kpi("Serious cases", n[3], p[3], HigherIsBetter: false));
+
+        if (n[0] == 0)
+        {
+            Findings.Add(new Finding("No vet records in this period."));
+        }
+        else
+        {
+            Findings.Add(new Finding(
+                $"There were {Plural(n[1], "illness or injury case", "illness and injury cases")}{Versus(n[1], p[1], v => v.ToString("N0"))}."
+                + (n[1] < p[1] ? " Animal health is improving." : n[1] > p[1] ? " Animal health is getting worse." : ""),
+                n[1] < p[1] ? "good" : n[1] > p[1] ? "bad" : "info"));
+
+            if (SpeciesId == null && AnimalId == null)
+            {
+                await using var cmd = Cmd(conn, $@"
+                    SELECT s.Common_Name, COUNT(*), (SELECT COUNT(*) FROM Animal x WHERE x.Species_ID = s.Species_ID AND x.Is_Active = 1) AS Herd
+                    FROM Health_Record h JOIN Animal a ON a.Animal_ID = h.Animal_ID JOIN Species s ON s.Species_ID = a.Species_ID
+                    WHERE {HealthWhere()} AND h.Record_Type IN ('Illness', 'Injury')
+                    GROUP BY s.Species_ID, s.Common_Name HAVING COUNT(*) >= 2
+                    ORDER BY COUNT(*) / GREATEST(Herd, 1) DESC, COUNT(*) DESC LIMIT 1");
+                foreach (var r in await RowsAsync(cmd))
+                    Findings.Add(new Finding($"{r[0]} had the most illness and injury for their numbers: {Plural(Convert.ToInt32(r[1]), "case", "cases")} across {Plural(Convert.ToInt32(r[2]), "animal", "animals")}.", "bad"));
+            }
+
+            await using (var cmd = Cmd(conn, $@"
+                SELECT h.Diagnosis, COUNT(*), COUNT(DISTINCT a.Enclosure_ID)
+                FROM Health_Record h JOIN Animal a ON a.Animal_ID = h.Animal_ID
+                WHERE {HealthWhere()} AND h.Record_Type IN ('Illness', 'Injury') AND NULLIF(TRIM(h.Diagnosis), '') IS NOT NULL
+                GROUP BY h.Diagnosis HAVING COUNT(*) >= 2 ORDER BY COUNT(*) DESC LIMIT 1"))
+                foreach (var r in await RowsAsync(cmd))
+                    Findings.Add(new Finding($"Most common diagnosis: {r[0]}, {Plural(Convert.ToInt32(r[1]), "case", "cases")} in {Plural(Convert.ToInt32(r[2]), "enclosure", "enclosures")}.", "bad"));
+
+            await using (var cmd = Cmd(conn, $@"
+                SELECT COUNT(*) FROM (
+                    SELECT h.Animal_ID,
+                           SUBSTRING_INDEX(GROUP_CONCAT(h.Weight_kg ORDER BY h.Exam_Date), ',', 1) + 0 AS First_Kg,
+                           SUBSTRING_INDEX(GROUP_CONCAT(h.Weight_kg ORDER BY h.Exam_Date DESC), ',', 1) + 0 AS Last_Kg
+                    FROM Health_Record h JOIN Animal a ON a.Animal_ID = h.Animal_ID
+                    WHERE {HealthWhere()} AND h.Weight_kg IS NOT NULL AND a.Is_Active = 1
+                    GROUP BY h.Animal_ID HAVING COUNT(*) >= 2) x
+                WHERE Last_Kg < First_Kg * 0.9"))
+            {
+                var lost = (await FirstRowAsync(cmd))[0];
+                if (lost > 0) Findings.Add(new Finding($"{Plural(lost, "animal", "animals")} lost 10% or more of their body weight during the period. See Weight changes.", "bad"));
+            }
+        }
+
+        await using (var cmd = Cmd(conn, $@"
+            SELECT COUNT(*) FROM Animal a
+            WHERE a.Is_Active = 1 {(SpeciesId != null ? "AND a.Species_ID = @species" : "")} {(AnimalId != null ? "AND a.Animal_ID = @animal" : "")}
+              AND NOT EXISTS (SELECT 1 FROM Health_Record h WHERE h.Animal_ID = a.Animal_ID AND h.Record_Type = 'Routine Checkup'
+                              AND h.Exam_Date >= @today - INTERVAL 365 DAY)"))
+        {
+            var overdue = (await FirstRowAsync(cmd))[0];
+            Findings.Add(overdue > 0
+                ? new Finding($"{Plural(overdue, "animal is", "animals are")} overdue for a yearly routine checkup as of today. See Overdue checkups.", "bad")
+                : new Finding("Every animal has had a routine checkup in the last year.", "good"));
+        }
+    }
+
     protected override Task<ReportTable> BuildAsync(MySqlConnection conn) => CurrentView.Key switch
     {
         "species" => BySpeciesAsync(conn),

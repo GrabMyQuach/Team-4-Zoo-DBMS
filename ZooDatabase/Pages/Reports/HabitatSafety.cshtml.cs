@@ -95,6 +95,75 @@ public class HabitatSafetyModel : RunnableReport
         ["open"] = ("Not finished", "COALESCE(m.Status, 'Open') NOT IN ('Completed', 'Cancelled')")
     };
 
+    // ===== Key findings =====
+    // Target: at least 90% of inspections pass.
+    protected override async Task AnalyzeAsync(MySqlConnection conn)
+    {
+        var (n, p) = await CompareAsync(() => Cmd(conn, $@"
+            SELECT (SELECT COUNT(*) FROM Habitat_Inspection i WHERE {InspWhere}),
+                   (SELECT SUM(i.Result = 'Pass') FROM Habitat_Inspection i WHERE {InspWhere}),
+                   (SELECT SUM(i.Result = 'Critical') FROM Habitat_Inspection i WHERE {InspWhere}),
+                   (SELECT SUM(COALESCE(m.Cost, 0)) FROM Maintenance m WHERE {RepairWhere})"));
+        decimal passNow = Rate(n[1], n[0]), passPrev = Rate(p[1], p[0]);
+        Kpis.Add(new Kpi("Inspections", n[0], p[0], HigherIsBetter: null));
+        Kpis.Add(new Kpi("Pass rate", passNow, p[0] == 0 ? null : passPrev, "pct"));
+        Kpis.Add(new Kpi("Critical findings", n[2], p[2], HigherIsBetter: false));
+        Kpis.Add(new Kpi("Repair cost", n[3], p[3], "money", HigherIsBetter: null));
+
+        if (n[0] > 0)
+        {
+            Findings.Add(new Finding(
+                $"{passNow:0.#}% of inspections passed" + (p[0] > 0 ? Versus(passNow, passPrev, v => v.ToString("0.#") + "%") : "")
+                + (passNow >= 90 ? ". That meets the 90% target." : ". That's below the 90% target."),
+                passNow >= 90 ? "good" : "bad"));
+
+            await using (var cmd = Cmd(conn, $@"
+                SELECT i.Issue_Category, COUNT(*), COUNT(DISTINCT i.Enclosure_ID), SUM(i.Result = 'Critical')
+                FROM Habitat_Inspection i WHERE {InspWhere} AND i.Result <> 'Pass' AND i.Issue_Category <> 'None'
+                GROUP BY i.Issue_Category ORDER BY COUNT(*) DESC LIMIT 1"))
+                foreach (var r in await RowsAsync(cmd))
+                    Findings.Add(new Finding($"The most common problem was {r[0]}: found {Plural(Convert.ToInt32(r[1]), "time", "times")} in {Plural(Convert.ToInt32(r[2]), "enclosure", "enclosures")}"
+                        + (Convert.ToInt32(r[3]) > 0 ? $", {Convert.ToInt32(r[3])} of them critical." : "."), "bad"));
+
+            if (EnclosureId == null)
+            {
+                await using var cmd = Cmd(conn, $@"
+                    SELECT e.Enclosure_Name, COUNT(*) FROM Habitat_Inspection i JOIN Enclosure e ON e.Enclosure_ID = i.Enclosure_ID
+                    WHERE {InspWhere} AND i.Result <> 'Pass'
+                    GROUP BY e.Enclosure_ID, e.Enclosure_Name HAVING COUNT(*) >= 2 ORDER BY COUNT(*) DESC LIMIT 1");
+                foreach (var r in await RowsAsync(cmd))
+                    Findings.Add(new Finding($"{r[0]} failed {Plural(Convert.ToInt32(r[1]), "inspection", "inspections")}, the most of any enclosure.", "bad"));
+            }
+        }
+        else Findings.Add(new Finding("No inspections were recorded in this period.", "bad"));
+
+        await using (var cmd = Cmd(conn, $@"
+            SELECT COUNT(*), SUM(m.Priority = 'Emergency') FROM Maintenance m
+            WHERE m.Enclosure_ID IS NOT NULL AND COALESCE(m.Status, 'Open') NOT IN ('Completed', 'Cancelled')
+              AND m.Request_Date < @today - INTERVAL 14 DAY {(EnclosureId != null ? "AND m.Enclosure_ID = @enclosure" : "")}"))
+        {
+            var r = await FirstRowAsync(cmd);
+            Findings.Add(r[0] > 0
+                ? new Finding($"{Plural(r[0], "repair has", "repairs have")} been open for more than 14 days" + (r[1] > 0 ? $", including {Plural(r[1], "emergency", "emergencies")}." : ".") + " See Open work orders.", "bad")
+                : new Finding("No enclosure repair has been waiting more than 14 days.", "good"));
+        }
+
+        await using (var cmd = Cmd(conn, $@"
+            SELECT GROUP_CONCAT(e.Enclosure_Name ORDER BY e.Enclosure_Name SEPARATOR ', ') FROM Enclosure e
+            WHERE e.Status = 'Closed' {(EnclosureId != null ? "AND e.Enclosure_ID = @enclosure" : "")}"))
+            foreach (var r in await RowsAsync(cmd))
+                if (r[0] != null) Findings.Add(new Finding($"Closed right now for safety: {r[0]}.", "bad"));
+
+        await using (var cmd = Cmd(conn, $@"
+            SELECT COUNT(*) FROM Enclosure e
+            WHERE NOT EXISTS (SELECT 1 FROM Habitat_Inspection i WHERE i.Enclosure_ID = e.Enclosure_ID AND i.Inspection_Date >= @today - INTERVAL 30 DAY)
+              {(EnclosureId != null ? "AND e.Enclosure_ID = @enclosure" : "")}"))
+        {
+            var stale = (await FirstRowAsync(cmd))[0];
+            if (stale > 0) Findings.Add(new Finding($"{Plural(stale, "enclosure hasn't", "enclosures haven't")} been inspected in the last 30 days.", "bad"));
+        }
+    }
+
     protected override Task<ReportTable> BuildAsync(MySqlConnection conn) => CurrentView.Key switch
     {
         "enclosure" => EnclosuresAsync(conn),

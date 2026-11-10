@@ -21,6 +21,9 @@ public static class ReportAccess
     // Revenue, expenses and profit are a management concern.
     public const string Revenue = "DBA,SuperUser";
 
+    // Encounter attendance and cancellations are a management concern.
+    public const string Encounters = "DBA,SuperUser";
+
     // Anyone who can see at least one report (used for the Reports link and overview page)
     public const string AnyReport = "DBA,SuperUser,Veterinarian,Zookeeper";
 

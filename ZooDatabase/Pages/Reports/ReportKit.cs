@@ -16,6 +16,43 @@ public record FilterField(string Name, string Label, List<ReportPageModel.Option
 
 public record Col(string Title, bool Num = false);
 
+// A headline number for the "Key findings" box, compared with the same-length period just before.
+// Format: "n" (count), "money", "pct" (compared in percentage points), "dec".
+// HigherIsBetter: true / false colours the change green or red; null keeps it neutral (e.g. costs that just "are").
+public record Kpi(string Label, decimal Now, decimal? Prev, string Format = "n", bool? HigherIsBetter = true)
+{
+    public string Show(decimal v) => Format switch
+    {
+        "money" => v.ToString("C0"),
+        "pct" => v.ToString("0.#") + "%",
+        "dec" => v.ToString("0.#"),
+        _ => v.ToString("N0")
+    };
+
+    public string? ChangeText
+    {
+        get
+        {
+            if (Prev == null) return null;
+            var diff = Now - Prev.Value;
+            if (Format == "pct") return diff == 0 ? "no change" : $"{(diff > 0 ? "+" : "")}{diff:0.#} pts";
+            if (Prev == 0) return Now == 0 ? "no change" : "new";
+            var pct = Math.Round(100 * diff / Prev.Value, 0);
+            return pct == 0 ? "no change" : $"{(pct > 0 ? "+" : "")}{pct}%";
+        }
+    }
+
+    private bool Unchanged => Prev == null || Now == Prev || ChangeText == "no change";
+
+    public string Arrow => Unchanged ? "" : Now > Prev ? "▲" : "▼";
+
+    public string Tone => Unchanged || HigherIsBetter == null ? "flat"
+                        : (Now > Prev) == HigherIsBetter ? "good" : "bad";
+}
+
+// One sentence in the "Key findings" box. Tone: "good" (green), "bad" (red) or "info".
+public record Finding(string Text, string Tone = "info");
+
 public class Cell
 {
     public string Text { get; init; } = "";
@@ -53,6 +90,15 @@ public abstract class RunnableReport : ReportPageModel
     public abstract IReadOnlyList<ReportView> Views { get; }
 
     public List<FilterField> Filters { get; } = new();
+
+    // "Key findings": headline numbers vs. the previous period, and sentences that answer the report's question
+    public List<Kpi> Kpis { get; } = new();
+    public List<Finding> Findings { get; } = new();
+    public DateTime PrevStart => StartDate.AddDays(-DayCount);
+    public string PrevRangeText => $"{PrevStart:MMM d} to {StartDate.AddDays(-1):MMM d, yyyy}";
+
+    // Each report fills Kpis and Findings here. It runs once per report run, whatever view is picked.
+    protected virtual Task AnalyzeAsync(MySqlConnection conn) => Task.CompletedTask;
     public ReportTable? Result { get; set; }
     public string ResultTitle { get; set; } = "";
 
@@ -73,6 +119,7 @@ public abstract class RunnableReport : ReportPageModel
         {
             ResultTitle = CurrentView.Title;
             Result = await BuildAsync(conn);
+            if (!IsDrill) await AnalyzeAsync(conn);
         }
         return Page();
     }
@@ -127,6 +174,53 @@ public abstract class RunnableReport : ReportPageModel
         UrlWith(("View", view), ("Key", key), ("Key2", key2), ("Back", CurrentView.Key), ("Run", "true"));
 
     public string BackUrl => UrlWith(("View", Back), ("Key", null), ("Key2", null), ("Back", null), ("Run", "true"));
+
+    // ---- Analysis helpers ----
+
+    // Runs a one-row query for this period and again for the previous period (same filters, @from/@to moved back)
+    protected static async Task<(decimal[] Now, decimal[] Prev)> CompareAsync(Func<MySqlCommand> make, DateTime prevFrom, DateTime prevTo)
+    {
+        await using var a = make();
+        var now = await FirstRowAsync(a);
+        await using var b = make();
+        b.Parameters["@from"].Value = prevFrom;
+        b.Parameters["@to"].Value = prevTo;
+        return (now, await FirstRowAsync(b));
+    }
+
+    protected Task<(decimal[] Now, decimal[] Prev)> CompareAsync(Func<MySqlCommand> make) => CompareAsync(make, PrevStart, StartDate);
+
+    protected static async Task<decimal[]> FirstRowAsync(MySqlCommand cmd)
+    {
+        await using var r = await cmd.ExecuteReaderAsync();
+        if (!await r.ReadAsync()) return Array.Empty<decimal>();
+        var row = new decimal[r.FieldCount];
+        for (int i = 0; i < r.FieldCount; i++) row[i] = r.IsDBNull(i) ? 0 : Convert.ToDecimal(r.GetValue(i));
+        return row;
+    }
+
+    // Rows as plain values (null stays null) for small "top 1" lookups
+    protected static async Task<List<object?[]>> RowsAsync(MySqlCommand cmd)
+    {
+        var list = new List<object?[]>();
+        await using var r = await cmd.ExecuteReaderAsync();
+        while (await r.ReadAsync())
+        {
+            var row = new object?[r.FieldCount];
+            for (int i = 0; i < r.FieldCount; i++) row[i] = r.IsDBNull(i) ? null : r.GetValue(i);
+            list.Add(row);
+        }
+        return list;
+    }
+
+    protected static decimal Rate(decimal part, decimal whole) => whole == 0 ? 0 : Math.Round(100 * part / whole, 1);
+
+    // ", up from 12 in the previous period" / ", down from ..." / ", the same as the previous period"
+    protected static string Versus(decimal now, decimal prev, Func<decimal, string> show) =>
+        now == prev ? ", the same as the previous period"
+        : $", {(now > prev ? "up" : "down")} from {show(prev)} in the previous period";
+
+    protected static string Plural(decimal n, string one, string many) => $"{n:N0} {(n == 1 ? one : many)}";
 
     // ---- Cell helpers ----
     protected static Cell N(int n, string? link = null) => new() { Text = n.ToString("N0"), Value = n, Link = n == 0 ? null : link };
