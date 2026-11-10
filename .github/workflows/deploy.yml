@@ -1,0 +1,30 @@
+# Deploys the zoo site to Azure every time someone pushes to main.
+# Save as .github/workflows/deploy.yml in the repo.
+# Needs one repo secret: AZURE_WEBAPP_PUBLISH_PROFILE (the publish profile file from the Azure portal).
+name: Deploy to Azure
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:   # also adds a "Run workflow" button on the Actions tab
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # If the build fails, nothing is deployed and the live site stays as it was
+      - name: Build
+        run: dotnet publish ZooDatabase/ZooDatabase.csproj -c Release -o publish
+
+      - name: Deploy
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ZooDatabase
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: publish
