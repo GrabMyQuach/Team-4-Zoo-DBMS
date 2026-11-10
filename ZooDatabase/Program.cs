@@ -63,7 +63,19 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseSession();
 
+// Tour guides can only open their own workspace (and the public site), see Data/GuideOptions.cs
+app.Use(async (context, next) =>
+{
+    if (ZooDatabase.Data.GuideOptions.IsGuideOnly(context.User)
+        && !ZooDatabase.Data.GuideOptions.GuideCanOpen(context.Request.Path))
+    {
+        context.Response.Redirect("/Guide");
+        return;
+    }
+    await next();
+});
+
 app.MapStaticAssets();
 app.MapRazorPages().WithStaticAssets();
 
-app.Run();
+app.Run();

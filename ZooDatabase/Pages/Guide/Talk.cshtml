@@ -1,0 +1,60 @@
+@page
+@model ZooDatabase.Pages.Guide.TalkModel
+@using ZooDatabase.Data
+@using ZooDatabase.Pages.Guide
+@{
+    ViewData["Title"] = "Talking Points";
+}
+
+<partial name="_GuideNav" model="@("talk")" />
+
+<h1 class="mb-1">Talking Points</h1>
+<p class="text-muted mb-4">Facts to share with guests for every species at the zoo.</p>
+
+<form method="get" class="d-flex flex-wrap gap-2 mb-4" style="max-width: 560px">
+    <label for="Q" class="visually-hidden">Search species or animal name</label>
+    <input id="Q" name="Q" value="@Model.Q" class="form-control" placeholder="Search a species or an animal's name" />
+    <button type="submit" class="btn btn-outline-primary">Search</button>
+    @if (!string.IsNullOrWhiteSpace(Model.Q))
+    {
+        <a href="/Guide/Talk" class="btn btn-link">Show all</a>
+    }
+</form>
+
+@if (Model.Species.Count == 0)
+{
+    <div class="card"><div class="card-body"><p class="mb-0">Nothing matches "@Model.Q".</p></div></div>
+}
+<div class="guide-species">
+    @foreach (var s in Model.Species)
+    {
+        <article class="guide-card" id="@PublicSite.Slug(s.Name)">
+            @if (s.Photo != null)
+            {
+                <img src="@s.Photo" alt="" loading="lazy" />
+            }
+            else
+            {
+                <span class="guide-card-empty" aria-hidden="true"></span>
+            }
+            <div class="guide-card-body">
+                <h2 class="guide-card-title">@s.Name</h2>
+                @if (s.Scientific != null)
+                {
+                    <p class="text-muted fst-italic mb-2">@s.Scientific</p>
+                }
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    @if (s.Diet != null) { <span class="badge bg-light text-dark border">Diet: @s.Diet</span> }
+                    @if (s.Habitat != null) { <span class="badge bg-light text-dark border">Habitat: @s.Habitat</span> }
+                    @if (s.Status != null) { <span class="badge @(GuideData.AtRisk(s.Status) ? "bg-danger" : "bg-success")">@s.Status</span> }
+                </div>
+                <ul class="guide-points">
+                    @foreach (var p in s.Points)
+                    {
+                        <li>@p</li>
+                    }
+                </ul>
+            </div>
+        </article>
+    }
+</div>

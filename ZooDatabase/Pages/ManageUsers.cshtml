@@ -45,7 +45,7 @@
                     <tr>
                         <td>@u.UserId</td>
                         <td>@u.Username</td>
-                        <td><span class="badge bg-success">@u.Role</span></td>
+                        <td><span class="badge bg-success">@ZooDatabase.Data.RoleNames.Label(u.Role)</span></td>
                         <td>
                             @if (u.IsActive)
                             {

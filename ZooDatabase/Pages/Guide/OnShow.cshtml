@@ -1,0 +1,74 @@
+@page
+@model ZooDatabase.Pages.Guide.OnShowModel
+@using ZooDatabase.Data
+@{
+    ViewData["Title"] = "Who's On Show";
+}
+
+<partial name="_GuideNav" model="@("onshow")" />
+
+<h1 class="mb-1">Who's On Show</h1>
+<p class="text-muted mb-4">@Model.OnShowCount animals can be visited today · @Model.Off.Count off exhibit</p>
+
+@if (Model.Off.Count > 0)
+{
+    <h2 class="h4 section-heading mb-3">Off exhibit today</h2>
+    <p class="text-muted">Don't promise these to guests. Their spot may look empty.</p>
+    <div class="care-list mb-5">
+        @foreach (var a in Model.Off)
+        {
+            <div class="care-row">
+                @if (a.Photo != null)
+                {
+                    <img src="@a.Photo" alt="" class="animal-thumb care-thumb" loading="lazy" />
+                }
+                else
+                {
+                    <span class="animal-thumb animal-thumb--empty care-thumb" aria-hidden="true"></span>
+                }
+                <div class="care-what">
+                    <span class="fw-semibold">@a.Name</span>
+                    <span class="text-muted">@a.Species · @a.Enclosure</span>
+                </div>
+                <span class="badge bg-warning text-dark">@a.OffReason</span>
+            </div>
+        }
+    </div>
+}
+
+<h2 class="h4 section-heading mb-3">On show</h2>
+@if (Model.Areas.Count == 0)
+{
+    <p class="text-muted">No animals are on show right now.</p>
+}
+@foreach (var area in Model.Areas)
+{
+    <div class="card mb-3">
+        <div class="card-body">
+            <h3 class="h5 mb-1">@area.Enclosure</h3>
+            @if (area.Location != null)
+            {
+                <p class="text-muted small mb-3">@area.Location</p>
+            }
+            <div class="guide-animals">
+                @foreach (var a in area.Animals)
+                {
+                    <a href="/Guide/Talk#@(PublicSite.Slug(a.Species))" class="guide-animal">
+                        @if (a.Photo != null)
+                        {
+                            <img src="@a.Photo" alt="" loading="lazy" />
+                        }
+                        else
+                        {
+                            <span class="guide-animal-empty" aria-hidden="true"></span>
+                        }
+                        <span>
+                            <span class="fw-semibold d-block">@a.Name</span>
+                            <span class="text-muted small">@a.Species</span>
+                        </span>
+                    </a>
+                }
+            </div>
+        </div>
+    </div>
+}

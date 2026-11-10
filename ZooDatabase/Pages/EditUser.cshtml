@@ -27,9 +27,14 @@
             <div class="mb-3">
                 <label class="form-label fw-semibold">Role</label>
                 <select asp-for="Role" class="form-select">
-                    @foreach (var r in AddUserModel.Roles)
+                    @* An old role that's no longer offered (like Customer) stays selected, so saving can't quietly change it *@
+                    @if (!ZooDatabase.Data.RoleNames.Stored.Contains(Model.Role))
                     {
-                        <option value="@r">@r</option>
+                        <option value="@Model.Role">@Model.Role (no longer used)</option>
+                    }
+                    @foreach (var r in ZooDatabase.Data.RoleNames.All)
+                    {
+                        <option value="@r.Role">@r.Label</option>
                     }
                 </select>
             </div>

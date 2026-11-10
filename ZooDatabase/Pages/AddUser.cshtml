@@ -25,9 +25,9 @@
             <div class="mb-3">
                 <label class="form-label fw-semibold">Role</label>
                 <select asp-for="Role" class="form-select">
-                    @foreach (var r in AddUserModel.Roles)
+                    @foreach (var r in ZooDatabase.Data.RoleNames.All)
                     {
-                        <option value="@r">@r</option>
+                        <option value="@r.Role">@r.Label</option>
                     }
                 </select>
             </div>

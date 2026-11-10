@@ -9,7 +9,7 @@ namespace ZooDatabase.Pages.Care;
 
 // Report a Problem: a keeper describes an enclosure problem and it becomes an open work order (Maintenance),
 // which shows up for the maintenance team and in the Habitat Safety report.
-[Authorize(Roles = CareOptions.KeeperRoles)]
+[Authorize(Roles = CareOptions.KeeperRoles + "," + GuideOptions.GuideRole)]
 public class ProblemModel : PageModel
 {
     private readonly IConfiguration _config;

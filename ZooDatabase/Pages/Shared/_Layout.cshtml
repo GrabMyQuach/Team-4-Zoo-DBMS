@@ -33,7 +33,7 @@
                         <a href="/" class="staff-link">View public site</a>
                         <a asp-page="/MyAccount" class="staff-user">
                             @User.Identity.Name
-                            <span class="staff-role">@User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value</span>
+                            <span class="staff-role">@RoleNames.Label(User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value)</span>
                         </a>
                         <form method="post" asp-page="/Logout" class="d-inline">
                             <button type="submit" class="btn btn-sm staff-logout">Log out</button>

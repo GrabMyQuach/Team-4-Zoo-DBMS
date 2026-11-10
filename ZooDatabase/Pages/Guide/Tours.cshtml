@@ -1,0 +1,114 @@
+@page
+@model ZooDatabase.Pages.Guide.ToursModel
+@{
+    ViewData["Title"] = "Today's Tours";
+}
+
+<partial name="_GuideNav" model="@("tours")" />
+
+<h1 class="mb-1">Today's Tours</h1>
+<p class="text-muted mb-4">@DateTime.Today.ToString("dddd, MMMM d") · animal encounters in time order. Tap Done after each one and enter how many guests came.</p>
+
+@if (Model.Today.Count == 0)
+{
+    <div class="card mb-4"><div class="card-body"><p class="mb-0">No animal encounters are scheduled today.</p></div></div>
+}
+<div class="care-list mb-5">
+    @foreach (var t in Model.Today)
+    {
+        <div class="care-row @(t.Status != "Scheduled" ? "is-done" : "")">
+            <div class="care-time">@t.Start.ToString("h:mm tt")</div>
+            @if (t.Photo != null)
+            {
+                <img src="@t.Photo" alt="" class="animal-thumb care-thumb" loading="lazy" />
+            }
+            else
+            {
+                <span class="animal-thumb animal-thumb--empty care-thumb" aria-hidden="true"></span>
+            }
+            <div class="care-what">
+                <span class="fw-semibold">@(t.Attraction ?? "Animal encounter") with @t.Animal</span>
+                <span class="text-muted">@t.Species · @(t.Where ?? t.Enclosure) · until @t.End.ToString("h:mm tt")</span>
+                <span class="text-muted small">Handler: @(t.Handler ?? "not assigned")@(t.MaxGuests != null ? " · up to " + t.MaxGuests + " guests" : "")</span>
+                @if (t.Warning != null)
+                {
+                    <span class="small text-danger fw-semibold">@t.Warning</span>
+                }
+            </div>
+            <div class="care-actions">
+                @if (t.Status == "Completed")
+                {
+                    <span class="badge bg-success">Done · @(t.Guests ?? 0) guests</span>
+                }
+                else if (t.Status == "Cancelled")
+                {
+                    <span class="badge bg-secondary">Cancelled@(t.CancelReason != null ? ": " + t.CancelReason : "")</span>
+                }
+                else if (t.CanFinish)
+                {
+                    <form method="post" asp-page-handler="Done" class="care-partial">
+                        <input type="hidden" name="encounterId" value="@t.Id" />
+                        <label class="visually-hidden" for="guests-@t.Id">Guests who came</label>
+                        <input id="guests-@t.Id" type="number" name="guests" min="0" max="@(t.MaxGuests ?? 500)" class="form-control" placeholder="Guests" required />
+                        <button type="submit" class="btn btn-primary">Done</button>
+                    </form>
+                }
+                else
+                {
+                    <span class="badge bg-light text-dark border">Coming up</span>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@if (Model.ThisWeek.Count > 0)
+{
+    <h2 class="h4 section-heading mb-3">Later this week</h2>
+    <div class="card mb-5"><div class="card-body">
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead><tr><th>When</th><th>Encounter</th><th>Animal</th><th>Where</th><th>Handler</th></tr></thead>
+                <tbody>
+                    @foreach (var t in Model.ThisWeek)
+                    {
+                        <tr>
+                            <td>@t.Start.ToString("ddd, MMM d · h:mm tt")</td>
+                            <td>@(t.Attraction ?? "Animal encounter")</td>
+                            <td>@t.Animal <span class="text-muted">(@t.Species)</span></td>
+                            <td>@(t.Where ?? t.Enclosure)</td>
+                            <td>@(t.Handler ?? "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div></div>
+}
+
+<h2 class="h4 section-heading mb-3">Attractions</h2>
+@if (Model.Attractions.Count == 0)
+{
+    <p class="text-muted">No attractions recorded.</p>
+}
+else
+{
+    <div class="card"><div class="card-body">
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead><tr><th>Attraction</th><th>Type</th><th>Where</th><th>Status</th></tr></thead>
+                <tbody>
+                    @foreach (var a in Model.Attractions)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@a.Name</td>
+                            <td>@(a.Type ?? "—")</td>
+                            <td>@(a.Location ?? "—")</td>
+                            <td><span class="badge @(a.IsOpen ? "bg-success" : "bg-secondary")">@(a.Status ?? "Open")</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div></div>
+}

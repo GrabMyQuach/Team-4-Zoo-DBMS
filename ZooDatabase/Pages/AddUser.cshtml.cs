@@ -15,12 +15,13 @@ public class AddUserModel : PageModel
         _config = config;
     }
 
-    public static readonly string[] Roles = { "Customer", "Admin", "SuperUser", "DBA" };
+    // Every role an account can have (Data/RoleNames.cs also has the name shown for each)
+    public static readonly string[] Roles = ZooDatabase.Data.RoleNames.Stored;
 
     [BindProperty] public string Username { get; set; } = "";
     [BindProperty] public string Password { get; set; } = "";
     [BindProperty] public string ConfirmPassword { get; set; } = "";
-    [BindProperty] public string Role { get; set; } = "Customer";
+    [BindProperty] public string Role { get; set; } = "ReadOnly";
 
     public string? ErrorMessage { get; set; }
 

@@ -15,7 +15,7 @@ public static class UserSeeder
             ("dba", "DBA"),
             ("superuser", "SuperUser"),
             ("admin", "Admin"),
-            ("customer", "Customer")
+            ("tourguide", "TourGuide")
         };
 
         using var conn = new MySqlConnection(config.GetConnectionString("ZooDb"));

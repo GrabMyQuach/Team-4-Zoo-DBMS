@@ -37,6 +37,7 @@ public class IndexModel : PageModel
     {
         if (SalesOptions.IsCashierOnly(User)) context.Result = Redirect("/Register");
         else if (CareOptions.LandsOnCare(User)) context.Result = Redirect("/Care");
+        else if (GuideOptions.IsGuideOnly(User)) context.Result = Redirect("/Guide");
     }
 
     public async Task OnGetAsync()

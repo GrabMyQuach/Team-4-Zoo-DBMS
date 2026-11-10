@@ -1,0 +1,50 @@
+@page
+@model ZooDatabase.Pages.Guide.IndexModel
+@{
+    ViewData["Title"] = "Tour Guide";
+    var hour = DateTime.Now.Hour;
+    var greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+}
+
+<partial name="_GuideNav" model="@("home")" />
+
+<h1 class="mb-1">@greeting</h1>
+<p class="text-muted mb-4">@DateTime.Today.ToString("dddd, MMMM d, yyyy") · What would you like to do?</p>
+
+<div class="register-cards">
+    <a href="/Guide/Tours" class="register-card">
+        <svg viewBox="0 0 64 64" width="88" height="88" aria-hidden="true">
+            <rect x="8" y="12" width="48" height="44" rx="6" fill="none" stroke="currentColor" stroke-width="4" />
+            <path d="M8 26h48M20 6v12M44 6v12" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" />
+            <circle cx="32" cy="41" r="8" fill="none" stroke="currentColor" stroke-width="4" />
+            <path d="M32 37v4l3 2" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+        </svg>
+        <span class="register-card-title">Today's Tours</span>
+        <span class="register-card-text">@(Model.ToursToday == 0 ? "None scheduled today" : $"{Model.ToursLeft} of {Model.ToursToday} still to come")</span>
+    </a>
+    <a href="/Guide/OnShow" class="register-card">
+        <svg viewBox="0 0 64 64" width="88" height="88" aria-hidden="true">
+            <path d="M4 32s10-18 28-18 28 18 28 18-10 18-28 18S4 32 4 32z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round" />
+            <circle cx="32" cy="32" r="9" fill="none" stroke="currentColor" stroke-width="4" />
+        </svg>
+        <span class="register-card-title">Who's On Show</span>
+        <span class="register-card-text">@Model.OnShow of @Model.AllAnimals animals can be visited</span>
+    </a>
+    <a href="/Guide/Talk" class="register-card">
+        <svg viewBox="0 0 64 64" width="88" height="88" aria-hidden="true">
+            <path d="M10 12h44a4 4 0 0 1 4 4v24a4 4 0 0 1-4 4H28l-12 10V44h-6a4 4 0 0 1-4-4V16a4 4 0 0 1 4-4z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round" />
+            <path d="M18 24h28M18 32h18" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" />
+        </svg>
+        <span class="register-card-title">Talking Points</span>
+        <span class="register-card-text">Fun facts for all @Model.SpeciesCount species</span>
+    </a>
+    <a href="/Care/Problem" class="register-card">
+        <svg viewBox="0 0 64 64" width="88" height="88" aria-hidden="true">
+            <path d="M32 8L58 54H6z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round" />
+            <path d="M32 26v12" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" />
+            <circle cx="32" cy="46" r="2.5" fill="currentColor" />
+        </svg>
+        <span class="register-card-title">Report a Problem</span>
+        <span class="register-card-text">Broken fence, spill, anything unsafe on your route</span>
+    </a>
+</div>

@@ -12,7 +12,7 @@
     <div class="card-body p-4">
         <h2 class="h5 fw-semibold mb-3">Account Info</h2>
         <p class="mb-1"><span class="text-muted">Username:</span> @Model.Username</p>
-        <p class="mb-0"><span class="text-muted">Role:</span> <span class="badge bg-success">@Model.Role</span></p>
+        <p class="mb-0"><span class="text-muted">Role:</span> <span class="badge bg-success">@ZooDatabase.Data.RoleNames.Label(Model.Role)</span></p>
     </div>
 </div>
 

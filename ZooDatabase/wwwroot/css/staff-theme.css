@@ -350,3 +350,16 @@ fieldset legend.form-label { font-size: 1rem; float: none; }
     .care-time { min-width: 0; }
     .care-timeline li { grid-template-columns: 1fr; gap: 4px; }
 }
+
+/* ---------- Tour guide workspace (/Guide) ---------- */
+.guide-animals { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.guide-animal { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 14px; background: var(--z-sand); color: var(--z-ink); text-decoration: none; }
+.guide-animal:hover { outline: 3px solid var(--z-green); color: var(--z-ink); }
+.guide-animal img, .guide-animal-empty { width: 52px; height: 52px; border-radius: 12px; object-fit: cover; flex: none; background: var(--z-green-soft); display: block; }
+.guide-species { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+.guide-card { background: #FFFFFF; border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; scroll-margin-top: 24px; }
+.guide-card:target { outline: 3px solid var(--z-green); }
+.guide-card img, .guide-card-empty { width: 100%; height: 200px; object-fit: cover; display: block; background: var(--z-green-soft); }
+.guide-card-body { padding: 18px 20px 20px; }
+.guide-card-title { font-family: var(--z-serif); font-weight: 700; font-size: 1.5rem; color: var(--z-green-dark); margin-bottom: 2px; }
+.guide-points { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 6px; }

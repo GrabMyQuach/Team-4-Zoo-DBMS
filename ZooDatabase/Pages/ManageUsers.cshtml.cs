@@ -28,7 +28,11 @@ public class ManageUsersModel : PageModel
         var sql = "SELECT User_ID, Username, Role, Is_Active, Created_At, Last_Login FROM User_Account";
         if (!string.IsNullOrWhiteSpace(Search))
         {
-            sql += " WHERE Username LIKE @search OR Role LIKE @search";
+            // Also match the names people see, so "manager" finds SuperUser accounts
+            var roles = ZooDatabase.Data.RoleNames.Matching(Search.Trim());
+            var roleList = string.Join(",", roles.Select(r => "'" + r + "'"));
+            sql += " WHERE Username LIKE @search OR Role LIKE @search"
+                   + (roles.Length > 0 ? " OR Role IN (" + roleList + ")" : "");
         }
         sql += " ORDER BY User_ID";
 

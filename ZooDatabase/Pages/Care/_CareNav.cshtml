@@ -4,7 +4,7 @@
 <div class="d-flex flex-wrap justify-content-between gap-2 mb-3 no-print">
     @if (Model != "home")
     {
-        <a href="/Care" class="back-link mt-0">← Home</a>
+        <a href="@(GuideOptions.IsGuideOnly(User) ? "/Guide" : "/Care")" class="back-link mt-0">← Home</a>
     }
     else
     {
