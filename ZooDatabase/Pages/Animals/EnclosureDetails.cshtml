@@ -40,7 +40,9 @@
 
 @if (e.Status != "Open")
 {
-    <div class="alert alert-warning">
+    bool closed = e.Status == "Closed";
+    int emergencies = Model.OpenRepairs.Count(m => m.Priority == "Emergency");
+    <div class="alert @(closed ? "alert-danger" : "alert-warning")">
         <strong>This enclosure is @e.Status.ToLower().</strong>
         @if (e.ClosedReason != null)
         {
@@ -49,6 +51,16 @@
         @if (e.StatusChangedAt != null)
         {
             <div class="small">Since @e.StatusChangedAt.Value.ToString("MMM d, yyyy h:mm tt")</div>
+        }
+        @if (closed)
+        {
+            @* The two steps the database requires before it reopens (trg_emergency_repair_done, trg_inspection_result) *@
+            <div class="reopen-steps mt-2">
+                <span class="small fw-semibold">To reopen:</span>
+                <span class="reopen-step @(emergencies == 0 ? "done" : "")">@(emergencies == 0 ? "✓" : "1") Emergency repair completed@(emergencies > 0 ? $" ({emergencies} open)" : "")</span>
+                <span class="reopen-arrow">→</span>
+                <span class="reopen-step">2 Re-inspection recorded as a Pass</span>
+            </div>
         }
     </div>
 }
@@ -121,6 +133,10 @@
                                         {
                                             <span class="badge @AnimalOptions.HealthBadgeClass(a.HealthStatus)">@a.HealthStatus</span>
                                         }
+                                        @if (a.NeedsRelocation)
+                                        {
+                                            <span class="badge bg-warning text-dark">To be moved</span>
+                                        }
                                     </td>
                                 </tr>
                             }
@@ -186,7 +202,16 @@
                                 @foreach (var m in Model.OpenRepairs)
                                 {
                                     <tr>
-                                        <td>@m.Description</td>
+                                        <td>
+                                            @if (ZooDatabase.Data.StaffOptions.CanEditMaintenance(User))
+                                            {
+                                                <a href="/Staff/MaintenanceEdit/@m.Id" class="fw-semibold">@m.Description</a>
+                                            }
+                                            else
+                                            {
+                                                @m.Description
+                                            }
+                                        </td>
                                         <td><span class="badge @EnclosureDetailsModel.PriorityBadge(m.Priority)">@m.Priority</span></td>
                                         <td>@(m.Status ?? "Open")</td>
                                         <td>@(m.Requested?.ToString("MMM d, yyyy") ?? "—")</td>

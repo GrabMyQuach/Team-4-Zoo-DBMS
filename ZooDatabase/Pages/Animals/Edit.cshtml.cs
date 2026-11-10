@@ -26,6 +26,8 @@ public class EditModel : PageModel
     public List<DropdownOption> EnclosureOptions { get; set; } = new();
     public List<BreedingOption> BreedingOptions { get; set; } = new();
     public string? ErrorMessage { get; set; }
+    // True when a trigger refused the change (SIGNAL 45000), so the page can say the database stopped it
+    public bool BlockedByDatabase { get; set; }
 
     public bool IsNew => Id == null;
 
@@ -151,6 +153,7 @@ public class EditModel : PageModel
         {
             // 45000 = a custom error thrown by a trigger with SIGNAL
             ErrorMessage = ex.Message;
+            BlockedByDatabase = ex.SqlState == "45000";
             await LoadDropdownsAsync(conn);
             return Page();
         }

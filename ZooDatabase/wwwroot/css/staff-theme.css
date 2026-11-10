@@ -195,6 +195,11 @@ header .btn.staff-logout:hover { background: var(--z-green-dark); color: #FFFFFF
 .badge.bg-warning { background-color: var(--z-accent) !important; color: var(--z-ink) !important; }
 .alert { border: none; border-radius: 14px; }
 .alert-success { background: var(--z-green-soft); color: var(--z-green-dark); }
+/* Result messages (what a save or a trigger just did): easy to read from across a room */
+.alert-success, .alert-danger, .alert-warning { border-left: 5px solid currentColor; }
+.alert-success { border-left-color: var(--z-green); font-size: 1.02rem; font-weight: 500; }
+.alert-danger { border-left-color: var(--z-bad); }
+.alert-warning { border-left-color: var(--z-warn); }
 
 /* ===== Forms ===== */
 .form-control, .form-select { border-radius: 12px; border: 2px solid var(--z-line); }
@@ -386,3 +391,12 @@ fieldset legend.form-label { font-size: 1rem; float: none; }
     /* Phones: keep the sidebar to one row; "← Main Menu" still gets you to the other sections */
     .module-sidebar .other-sections-title, .module-sidebar .other-sections { display: none; }
 }
+
+/* Closed enclosure: the two steps before it can reopen */
+.reopen-steps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.reopen-step { background: rgba(255,255,255,.7); border-radius: 999px; padding: 2px 10px; font-size: .85rem; }
+.reopen-step.done { background: var(--z-green-soft); color: var(--z-green-dark); font-weight: 600; }
+.reopen-arrow { opacity: .6; }
+/* A trigger refused the change */
+.db-blocked { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; opacity: .85; }
+.db-blocked::before { content: "⛔ "; }

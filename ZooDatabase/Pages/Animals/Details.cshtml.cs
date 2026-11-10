@@ -89,7 +89,7 @@ public class DetailsModel : PageModel
 
         // 2. Is it in quarantine right now?
         await using (var cmd = new MySqlCommand(@"
-            SELECT Start_Date, Expected_End_Date, Reason, Status, Quarantine_ID
+            SELECT Start_Date, Expected_End_Date, Reason, Status, Quarantine_ID, Health_Record_ID
             FROM Quarantine
             WHERE Animal_ID = @id AND Status IN ('Active', 'Extended')
             ORDER BY Start_Date DESC LIMIT 1", conn))
@@ -104,9 +104,25 @@ public class DetailsModel : PageModel
                     ExpectedEnd = Date(r, 1),
                     Reason = Str(r, 2),
                     Status = r.GetString(3),
-                    Id = r.GetInt32(4)
+                    Id = r.GetInt32(4),
+                    HealthRecordId = r.IsDBNull(5) ? null : r.GetInt32(5)
                 };
             }
+        }
+
+        // The exposure checks the contagious-diagnosis trigger opened for the animals sharing the enclosure
+        if (ActiveQuarantine?.HealthRecordId != null)
+        {
+            await using var cmd = new MySqlCommand(@"
+                SELECT a.Animal_ID, a.Animal_Name, ct.Status
+                FROM Care_Task ct JOIN Animal a ON a.Animal_ID = ct.Animal_ID
+                WHERE ct.Source_Type = 'Health_Record' AND ct.Source_ID = @record AND ct.Animal_ID <> @id
+                ORDER BY a.Animal_Name", conn);
+            cmd.Parameters.AddWithValue("@record", ActiveQuarantine.HealthRecordId);
+            cmd.Parameters.AddWithValue("@id", id);
+            await using var r = await cmd.ExecuteReaderAsync();
+            while (await r.ReadAsync())
+                ActiveQuarantine.Exposed.Add((r.GetInt32(0), r.GetString(1), r.GetString(2)));
         }
 
         // 3. Conservation program enrollment (if any)
@@ -488,6 +504,8 @@ public class DetailsModel : PageModel
         public DateTime? ExpectedEnd { get; set; }
         public string? Reason { get; set; }
         public string Status { get; set; } = "";
+        public int? HealthRecordId { get; set; }
+        public List<(int Id, string Name, string Status)> Exposed { get; } = new();
     }
 
     public class ConservationInfo

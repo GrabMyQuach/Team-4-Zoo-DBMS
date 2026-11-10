@@ -56,7 +56,7 @@ public class EnclosureDetailsModel : PageModel
 
         // 2. Animals living here
         await using (var cmd = new MySqlCommand(@"
-            SELECT a.Animal_ID, a.Animal_Name, s.Common_Name, a.Gender, a.Health_Status
+            SELECT a.Animal_ID, a.Animal_Name, s.Common_Name, a.Gender, a.Health_Status, a.Needs_Relocation
             FROM Animal a
             JOIN Species s ON s.Species_ID = a.Species_ID
             WHERE a.Enclosure_ID = @id AND a.Is_Active = 1
@@ -72,7 +72,8 @@ public class EnclosureDetailsModel : PageModel
                     Name = r.GetString(1),
                     Species = r.GetString(2),
                     Gender = Str(r, 3),
-                    HealthStatus = Str(r, 4)
+                    HealthStatus = Str(r, 4),
+                    NeedsRelocation = !r.IsDBNull(5) && Convert.ToBoolean(r.GetValue(5))
                 });
             }
         }
@@ -104,7 +105,7 @@ public class EnclosureDetailsModel : PageModel
 
         // 4. Unfinished maintenance, most urgent first
         await using (var cmd = new MySqlCommand(@"
-            SELECT m.Description, m.Priority, m.Status, m.Request_Date, CONCAT(e.First_Name, ' ', e.Last_Name)
+            SELECT m.Description, m.Priority, m.Status, m.Request_Date, CONCAT(e.First_Name, ' ', e.Last_Name), m.Maintenance_ID
             FROM Maintenance m
             LEFT JOIN Employee e ON e.Employee_ID = m.Employee_ID
             WHERE m.Enclosure_ID = @id AND (m.Status IS NULL OR m.Status <> 'Completed')
@@ -120,7 +121,8 @@ public class EnclosureDetailsModel : PageModel
                     Priority = r.GetString(1),
                     Status = Str(r, 2),
                     Requested = r.IsDBNull(3) ? null : r.GetDateTime(3),
-                    AssignedTo = Str(r, 4)
+                    AssignedTo = Str(r, 4),
+                    Id = r.GetInt32(5)
                 });
             }
         }
@@ -187,6 +189,7 @@ public class EnclosureDetailsModel : PageModel
         public string Species { get; set; } = "";
         public string? Gender { get; set; }
         public string? HealthStatus { get; set; }
+        public bool NeedsRelocation { get; set; }
     }
 
     public class KeeperRow
@@ -199,6 +202,7 @@ public class EnclosureDetailsModel : PageModel
 
     public class RepairRow
     {
+        public int Id { get; set; }
         public string? Description { get; set; }
         public string Priority { get; set; } = "";
         public string? Status { get; set; }

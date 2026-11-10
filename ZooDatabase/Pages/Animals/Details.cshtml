@@ -59,6 +59,17 @@
         {
             <div class="small mt-1">Reason: @q.Reason</div>
         }
+        @if (q.Exposed.Count > 0)
+        {
+            <div class="small mt-1">
+                Exposure checks for the animals it lives with:
+                @for (int i = 0; i < q.Exposed.Count; i++)
+                {
+                    var x = q.Exposed[i];
+                    <a href="/Animals/Details/@x.Id" class="alert-link">@x.Name</a>@(x.Status is "Completed" or "Cancelled" ? $" ({x.Status.ToLower()})" : "")@(i < q.Exposed.Count - 1 ? ", " : "")
+                }
+            </div>
+        }
         @if (Model.CanRecordHealth)
         {
             <form method="post" asp-page-handler="ReleaseQuarantine" asp-route-id="@a.AnimalId" class="mt-2"

@@ -11,6 +11,12 @@
     var module = ZooModules.Find(parts.ElementAtOrDefault(0));
     var currentSection = parts.ElementAtOrDefault(1);
 
+    // Inspections belong to an enclosure
+    if (currentSection != null && currentSection.StartsWith("Inspection", StringComparison.OrdinalIgnoreCase))
+    {
+        currentSection = "Enclosures";
+    }
+
     // Pages that aren't in the sidebar
     // highlight their related section.
     if (module != null && !module.Sections.Any(s =>

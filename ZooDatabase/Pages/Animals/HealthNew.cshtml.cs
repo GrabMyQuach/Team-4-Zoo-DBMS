@@ -94,6 +94,9 @@ public class HealthNewModel : PageModel
         // 2. Save it. If it's contagious, the trigger does the rest.
         try
         {
+            // Booked encounters before saving, so the message counts only the ones this exam cancelled
+            long encountersBefore = await ScheduledEncountersAsync(conn);
+
             long recordId;
             await using (var cmd = new MySqlCommand(@"
                 INSERT INTO Health_Record (Animal_ID, Vet_Employee_ID, Exam_Date, Record_Type, Diagnosis,
@@ -115,7 +118,7 @@ public class HealthNewModel : PageModel
             }
 
             TempData["Success"] = Input.IsContagious
-                ? await DescribeQuarantineAsync(conn, recordId)
+                ? await DescribeQuarantineAsync(conn, recordId, encountersBefore - await ScheduledEncountersAsync(conn))
                 : $"Exam recorded for {AnimalName}.";
             return Redirect(!string.IsNullOrEmpty(Back) && Url.IsLocalUrl(Back) ? Back : $"/Animals/Details/{Id}");
         }
@@ -129,17 +132,23 @@ public class HealthNewModel : PageModel
     }
 
     // After a contagious exam, read back what the trigger created so staff can see it happened
-    private async Task<string> DescribeQuarantineAsync(MySqlConnection conn, long recordId)
+    private async Task<long> ScheduledEncountersAsync(MySqlConnection conn)
+    {
+        await using var cmd = new MySqlCommand(@"
+            SELECT COUNT(*) FROM Animal_Encounter
+            WHERE Animal_ID = @animal AND Status = 'Scheduled' AND Scheduled_Start >= NOW()", conn);
+        cmd.Parameters.AddWithValue("@animal", Id);
+        return Convert.ToInt64(await cmd.ExecuteScalarAsync());
+    }
+
+    private async Task<string> DescribeQuarantineAsync(MySqlConnection conn, long recordId, long cancelled)
     {
         await using var cmd = new MySqlCommand(@"
             SELECT (SELECT Expected_End_Date FROM Quarantine
                     WHERE Animal_ID = @animal AND Status IN ('Active', 'Extended')
                     ORDER BY Quarantine_ID DESC LIMIT 1),
                    (SELECT COUNT(*) FROM Care_Task
-                    WHERE Source_Type = 'Health_Record' AND Source_ID = @record),
-                   (SELECT COUNT(*) FROM Animal_Encounter
-                    WHERE Animal_ID = @animal AND Status = 'Cancelled'
-                      AND Cancel_Reason LIKE 'Quarantine:%' AND Scheduled_Start >= NOW())", conn);
+                    WHERE Source_Type = 'Health_Record' AND Source_ID = @record)", conn);
         cmd.Parameters.AddWithValue("@animal", Id);
         cmd.Parameters.AddWithValue("@record", recordId);
         await using var r = await cmd.ExecuteReaderAsync();
@@ -147,7 +156,6 @@ public class HealthNewModel : PageModel
 
         string until = r.IsDBNull(0) ? "" : $" until {r.GetDateTime(0):MMM d}";
         long tasks = Convert.ToInt64(r.GetValue(1));
-        long cancelled = Convert.ToInt64(r.GetValue(2));
         return $"Exam recorded. {AnimalName} is now in quarantine{until}: " +
                $"{cancelled} upcoming encounter(s) cancelled, {tasks} follow-up task(s) created, and the keepers were alerted.";
     }

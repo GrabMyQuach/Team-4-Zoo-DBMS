@@ -27,6 +27,8 @@ public class EncounterNewModel : PageModel
     public List<Option> Attractions { get; set; } = new();
     public List<Option> Handlers { get; set; } = new();
     public string? ErrorMessage { get; set; }
+    // True when a trigger refused the change (SIGNAL 45000), so the page can say the database stopped it
+    public bool BlockedByDatabase { get; set; }
 
     public async Task OnGetAsync(int? attraction, int? animal)
     {
@@ -100,6 +102,7 @@ public class EncounterNewModel : PageModel
         catch (MySqlException ex) when (ex.SqlState == "45000")
         {
             // trg_encounter_guard said no
+            BlockedByDatabase = true;
             var animal = Animals.First(a => a.Id == Input.AnimalId);
             ErrorMessage = $"Can't book {animal.Name}: {ex.Message}" +
                            (animal.Reason != null ? $" ({animal.Reason})." : ".");

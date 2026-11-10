@@ -21,7 +21,10 @@
 
         @if (Model.ErrorMessage != null)
         {
-            <div class="alert alert-danger py-2">@Model.ErrorMessage</div>
+            <div class="alert alert-danger py-2">
+                @if (Model.BlockedByDatabase) { <div class="db-blocked">Blocked by a database rule</div> }
+                @Model.ErrorMessage
+            </div>
         }
 
         <form method="post">
