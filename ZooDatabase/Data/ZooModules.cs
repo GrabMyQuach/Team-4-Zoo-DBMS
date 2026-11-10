@@ -32,7 +32,8 @@ public static class ZooModules
             new("Ticket Types", "TicketTypes"),
             new("Customers", "Customers"),
             new("Memberships", "Memberships"),
-            new("Attractions", "Attractions")
+            new("Attractions", "Attractions"),
+            new("Encounters", "Encounters")
         }),
 
         new("Shop", "Food & Gift Shop", "", "card-shop.png", "Food stands, gift shops, inventory, and sales", new ModuleSection[]

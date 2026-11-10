@@ -25,6 +25,8 @@ public class DetailsModel : PageModel
     public List<FeedingEntry> FeedingSchedule { get; set; } = new();
     public List<DietItem> SpeciesDiet { get; set; } = new();
     public List<CareTeamMember> CareTeam { get; set; } = new();
+    public List<(int Id, DateTime Start, string? Attraction, string? Handler, int? MaxGuests)> Encounters { get; set; } = new();
+    public bool CanBookEncounter => SalesOptions.CanBookEncounter(User);
     public int Enclosemates { get; set; }
 
     public bool CanEdit => AnimalOptions.CanEdit(User);
@@ -262,6 +264,22 @@ public class DetailsModel : PageModel
         {
             cmd.Parameters.AddWithValue("@enc", Animal.EnclosureId);
             Enclosemates = Convert.ToInt32(await cmd.ExecuteScalarAsync());
+        }
+
+        // 10. Upcoming public encounters with this animal
+        await using (var cmd = new MySqlCommand(@"
+            SELECT ae.Encounter_ID, ae.Scheduled_Start, at.Attraction_Name, CONCAT(h.First_Name, ' ', h.Last_Name), ae.Max_Guests
+            FROM Animal_Encounter ae
+            LEFT JOIN Attraction at ON at.Attraction_ID = ae.Attraction_ID
+            LEFT JOIN Employee h ON h.Employee_ID = ae.Handler_Employee_ID
+            WHERE ae.Animal_ID = @id AND ae.Status = 'Scheduled' AND ae.Scheduled_Start >= NOW()
+            ORDER BY ae.Scheduled_Start LIMIT 5", conn))
+        {
+            cmd.Parameters.AddWithValue("@id", id);
+            await using var r = await cmd.ExecuteReaderAsync();
+            while (await r.ReadAsync())
+                Encounters.Add((r.GetInt32(0), r.GetDateTime(1), r.IsDBNull(2) ? null : r.GetString(2),
+                    r.IsDBNull(3) ? null : r.GetString(3), r.IsDBNull(4) ? null : r.GetInt32(4)));
         }
 
         return Page();

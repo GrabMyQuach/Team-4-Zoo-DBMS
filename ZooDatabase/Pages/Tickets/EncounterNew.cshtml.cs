@@ -28,7 +28,7 @@ public class EncounterNewModel : PageModel
     public List<Option> Handlers { get; set; } = new();
     public string? ErrorMessage { get; set; }
 
-    public async Task OnGetAsync(int? attraction)
+    public async Task OnGetAsync(int? attraction, int? animal)
     {
         await using var conn = new MySqlConnection(_config.GetConnectionString("ZooDb"));
         await conn.OpenAsync();
@@ -39,6 +39,7 @@ public class EncounterNewModel : PageModel
         Input.DurationMinutes = 30;
         Input.MaxGuests = 10;
         Input.AttractionId = attraction ?? 0;
+        Input.AnimalId = animal ?? 0;
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -57,6 +58,27 @@ public class EncounterNewModel : PageModel
             ErrorMessage = "Max guests must be at least 1.";
         if (ErrorMessage != null) return Page();
 
+        // The same animal or handler can't be in two encounters at once
+        await using (var clash = new MySqlCommand(@"
+            SELECT CONCAT(a.Animal_Name, ' is'), ae.Scheduled_Start FROM Animal_Encounter ae JOIN Animal a ON a.Animal_ID = ae.Animal_ID
+            WHERE ae.Animal_ID = @animal AND ae.Status = 'Scheduled'
+              AND ae.Scheduled_Start < @end AND ae.Scheduled_Start + INTERVAL ae.Duration_Minutes MINUTE > @start
+            UNION ALL
+            SELECT CONCAT(e.First_Name, ' ', e.Last_Name, ' is'), ae.Scheduled_Start FROM Animal_Encounter ae JOIN Employee e ON e.Employee_ID = ae.Handler_Employee_ID
+            WHERE ae.Handler_Employee_ID = @handler AND ae.Status = 'Scheduled'
+              AND ae.Scheduled_Start < @end AND ae.Scheduled_Start + INTERVAL ae.Duration_Minutes MINUTE > @start
+            LIMIT 1", conn))
+        {
+            clash.Parameters.AddWithValue("@animal", Input.AnimalId);
+            clash.Parameters.AddWithValue("@handler", Input.HandlerId);
+            clash.Parameters.AddWithValue("@start", Input.ScheduledStart);
+            clash.Parameters.AddWithValue("@end", Input.ScheduledStart.AddMinutes(Input.DurationMinutes));
+            await using var r = await clash.ExecuteReaderAsync();
+            if (await r.ReadAsync())
+                ErrorMessage = $"{r.GetString(0)} already booked for an encounter at {r.GetDateTime(1):h:mm tt} on {r.GetDateTime(1):MMM d}. Pick another time.";
+        }
+        if (ErrorMessage != null) return Page();
+
         try
         {
             await using var cmd = new MySqlCommand(@"
@@ -73,7 +95,7 @@ public class EncounterNewModel : PageModel
 
             var animal = Animals.First(a => a.Id == Input.AnimalId);
             TempData["Success"] = $"Encounter with {animal.Name} booked for {Input.ScheduledStart:ddd, MMM d 'at' h:mm tt}.";
-            return RedirectToPage("/Tickets/Attractions");
+            return Redirect("/Tickets/Encounters");
         }
         catch (MySqlException ex) when (ex.SqlState == "45000")
         {
