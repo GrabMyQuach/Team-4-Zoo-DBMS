@@ -54,6 +54,10 @@ public abstract class ReportPageModel : PageModel
     {
         cmd.Parameters.AddWithValue("@from", StartDate);
         cmd.Parameters.AddWithValue("@to", EndExclusive);
+        // "Today" and "now" in Houston time. The database clock (CURDATE / NOW) runs on UTC,
+        // which is already tomorrow after 6 PM here, so reports never use it.
+        cmd.Parameters.AddWithValue("@today", DateTime.Today);
+        cmd.Parameters.AddWithValue("@now", DateTime.Now);
     }
 
     // Loads a dropdown list from a query that returns (id, name)
@@ -65,6 +69,12 @@ public abstract class ReportPageModel : PageModel
         while (await r.ReadAsync()) list.Add(new Option(r.GetInt32(0), r.GetString(1)));
         return list;
     }
+
+    // Every animal for the Animal filter, like "Zuri (Lion)". Animals no longer at the zoo are marked so old records can still be found.
+    protected static Task<List<Option>> LoadAnimalOptionsAsync(MySqlConnection conn) => LoadOptionsAsync(conn, @"
+        SELECT a.Animal_ID, CONCAT(a.Animal_Name, ' (', s.Common_Name, ')', IF(a.Is_Active = 1, '', ' - no longer here'))
+        FROM Animal a JOIN Species s ON s.Species_ID = a.Species_ID
+        ORDER BY a.Is_Active DESC, a.Animal_Name");
 
     // Read helpers: database NULL becomes null / 0
     protected static string? Str(DbDataReader r, int i) => r.IsDBNull(i) ? null : Convert.ToString(r.GetValue(i));

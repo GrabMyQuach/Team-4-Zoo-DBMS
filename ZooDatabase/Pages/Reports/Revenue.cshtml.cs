@@ -39,7 +39,7 @@ public class RevenueModel : RunnableReport
     };
 
     // Tickets count on the visit date, and only past visits (future dates are bookings, not visitors yet)
-    private const string TicketWhere = "ts.Visit_Date >= @from AND ts.Visit_Date < @to AND ts.Visit_Date <= CURDATE()";
+    private const string TicketWhere = "ts.Visit_Date >= @from AND ts.Visit_Date < @to AND ts.Visit_Date <= @today";
     private const string SaleWhere = "s.Sale_Date >= @from AND s.Sale_Date < @to";
     private const string TicketFrom = @"
         FROM Ticket_Purchase_Item i
@@ -117,7 +117,7 @@ public class RevenueModel : RunnableReport
         {
             await Read($@"SELECT DATE_FORMAT(s.Shift_Date, '%Y-%m'), SUM({PaidHours} * {HourlyRate})
                           FROM Employee_Shift s JOIN Employee e ON e.Employee_ID = s.Employee_ID
-                          WHERE s.Status = 'Worked' AND s.Shift_Date >= @from AND s.Shift_Date < @to AND s.Shift_Date <= CURDATE()
+                          WHERE s.Status = 'Worked' AND s.Shift_Date >= @from AND s.Shift_Date < @to AND s.Shift_Date <= @today
                           GROUP BY 1",
                 (m, r) => m.Labor = Math.Round(Dec(r, 1), 2));
             await Read(@"SELECT DATE_FORMAT(Received_Date, '%Y-%m'), SUM(Total_Cost) FROM Purchase_Order
@@ -361,7 +361,7 @@ public class RevenueModel : RunnableReport
         await using var cmd = Cmd(conn, $@"
             SELECT ts.Visit_Date, COUNT(DISTINCT ts.TicketPurchase_ID), SUM(i.Quantity), SUM(i.Quantity * i.Unit_Price)
             {TicketFrom}
-            WHERE ts.Visit_Date > CURDATE() AND ts.Visit_Date <= CURDATE() + INTERVAL 14 DAY
+            WHERE ts.Visit_Date > @today AND ts.Visit_Date <= @today + INTERVAL 14 DAY
             GROUP BY ts.Visit_Date ORDER BY ts.Visit_Date");
         await using var r = await cmd.ExecuteReaderAsync();
         while (await r.ReadAsync())
@@ -598,7 +598,7 @@ public class RevenueModel : RunnableReport
     private async Task<ReportTable> LaborAsync(MySqlConnection conn)
     {
         var (type, text) = SplitKey(Key);
-        var where = "s.Status = 'Worked' AND s.Shift_Date >= @from AND s.Shift_Date < @to AND s.Shift_Date <= CURDATE()";
+        var where = "s.Status = 'Worked' AND s.Shift_Date >= @from AND s.Shift_Date < @to AND s.Shift_Date <= @today";
         object? k = null;
         if (type == "m") { where += " AND DATE_FORMAT(s.Shift_Date, '%Y-%m') = @k"; k = text; }
 

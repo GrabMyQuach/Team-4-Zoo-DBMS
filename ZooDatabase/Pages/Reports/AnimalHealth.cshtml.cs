@@ -30,6 +30,7 @@ public class AnimalHealthModel : RunnableReport
 
     // ---- Filters (plus From/To) ----
     [BindProperty(SupportsGet = true)] public int? SpeciesId { get; set; }
+    [BindProperty(SupportsGet = true)] public int? AnimalId { get; set; }
     [BindProperty(SupportsGet = true)] public int? VetId { get; set; }
     [BindProperty(SupportsGet = true)] public int? TypeId { get; set; }
 
@@ -39,6 +40,7 @@ public class AnimalHealthModel : RunnableReport
 
     private List<Option> _species = new();
     private List<Option> _vets = new();
+    private List<Option> _animals = new();
 
     // What each kind of count means, so a number and its source records always use the same rule
     private static readonly Dictionary<string, (string Label, string Sql)> Kinds = new()
@@ -60,7 +62,9 @@ public class AnimalHealthModel : RunnableReport
             FROM Veterinarian v JOIN Employee e ON e.Employee_ID = v.Employee_ID ORDER BY e.Last_Name");
         var types = RecordTypes.Select((t, i) => new Option(i + 1, t)).ToList();
 
+        _animals = await LoadAnimalOptionsAsync(conn);
         Filters.Add(new FilterField(nameof(SpeciesId), "Species", _species, SpeciesId?.ToString()));
+        Filters.Add(new FilterField(nameof(AnimalId), "Animal", _animals, AnimalId?.ToString()));
         Filters.Add(new FilterField(nameof(VetId), "Vet", _vets, VetId?.ToString()));
         Filters.Add(new FilterField(nameof(TypeId), "Record type", types, TypeId?.ToString()));
     }
@@ -70,6 +74,7 @@ public class AnimalHealthModel : RunnableReport
     {
         var w = useDates ? "h.Exam_Date >= @from AND h.Exam_Date < @to" : "1=1";
         if (SpeciesId != null) w += " AND a.Species_ID = @species";
+        if (AnimalId != null) w += " AND a.Animal_ID = @animal";
         if (VetId != null) w += " AND h.Vet_Employee_ID = @vet";
         if (RecordType != null) w += " AND h.Record_Type = @rtype";
         return w;
@@ -80,6 +85,7 @@ public class AnimalHealthModel : RunnableReport
         var cmd = new MySqlCommand(sql, conn);
         AddDateParams(cmd);
         if (SpeciesId != null) cmd.Parameters.AddWithValue("@species", SpeciesId);
+        if (AnimalId != null) cmd.Parameters.AddWithValue("@animal", AnimalId);
         if (VetId != null) cmd.Parameters.AddWithValue("@vet", VetId);
         if (RecordType != null) cmd.Parameters.AddWithValue("@rtype", RecordType);
         return cmd;
@@ -217,7 +223,8 @@ public class AnimalHealthModel : RunnableReport
             JOIN Species s ON s.Species_ID = a.Species_ID
             JOIN Enclosure e ON e.Enclosure_ID = a.Enclosure_ID
             WHERE a.Is_Active = 1 {(SpeciesId != null ? "AND a.Species_ID = @species" : "")}
-            HAVING Last_Checkup IS NULL OR Last_Checkup < CURDATE() - INTERVAL 365 DAY
+                  {(AnimalId != null ? "AND a.Animal_ID = @animal" : "")}
+            HAVING Last_Checkup IS NULL OR Last_Checkup < @today - INTERVAL 365 DAY
             ORDER BY Last_Checkup");
         await using var r = await cmd.ExecuteReaderAsync();
         while (await r.ReadAsync())
@@ -288,12 +295,13 @@ public class AnimalHealthModel : RunnableReport
                       new Col("Expected end"), new Col("Ended"), new Col("Days", true), new Col("Status"));
         await using var cmd = Cmd(conn, $@"
             SELECT a.Animal_ID, a.Animal_Name, s.Common_Name, q.Reason, q.Start_Date, q.Expected_End_Date,
-                   q.Actual_End_Date, DATEDIFF(COALESCE(q.Actual_End_Date, CURDATE()), q.Start_Date), q.Status
+                   q.Actual_End_Date, DATEDIFF(COALESCE(q.Actual_End_Date, @today), q.Start_Date), q.Status
             FROM Quarantine q
             JOIN Animal a ON a.Animal_ID = q.Animal_ID
             JOIN Species s ON s.Species_ID = a.Species_ID
             WHERE q.Start_Date >= @from AND q.Start_Date < @to
                   {(SpeciesId != null ? "AND a.Species_ID = @species" : "")}
+                  {(AnimalId != null ? "AND a.Animal_ID = @animal" : "")}
             ORDER BY q.Start_Date DESC");
         await using var r = await cmd.ExecuteReaderAsync();
         while (await r.ReadAsync())
@@ -392,8 +400,9 @@ public class AnimalHealthModel : RunnableReport
             FROM Care_Task ct
             LEFT JOIN Animal a ON a.Animal_ID = ct.Animal_ID
             WHERE ct.Assigned_Employee_ID = @vet AND ct.Status IN ('Open', 'In Progress')
-            ORDER BY (ct.Due_At < NOW()) DESC, FIELD(ct.Priority, 'Urgent', 'High', 'Normal', 'Low'), ct.Due_At", conn);
+            ORDER BY (ct.Due_At < @now) DESC, FIELD(ct.Priority, 'Urgent', 'High', 'Normal', 'Low'), ct.Due_At", conn);
         cmd.Parameters.AddWithValue("@vet", vetId);
+        cmd.Parameters.AddWithValue("@now", DateTime.Now);
         await using var r = await cmd.ExecuteReaderAsync();
         while (await r.ReadAsync())
         {

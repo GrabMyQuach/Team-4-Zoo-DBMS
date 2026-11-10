@@ -30,7 +30,9 @@ public class StaffingModel : RunnableReport
     };
 
     [BindProperty(SupportsGet = true)] public int? DepartmentId { get; set; }
+    [BindProperty(SupportsGet = true)] public int? EmployeeId { get; set; }
     private List<Option> _departments = new();
+    private List<Option> _employees = new();
 
     // A shift counts toward the department it was worked in, or the person's home department
     private const string ShiftDept = "COALESCE(s.Department_ID, e.Department_ID)";
@@ -38,13 +40,17 @@ public class StaffingModel : RunnableReport
     private const string WorkedHours = $"COALESCE(SUM(CASE WHEN s.Status = 'Worked' THEN {PaidHours} END), 0)";
     private const string WorkedCost = $"COALESCE(SUM(CASE WHEN s.Status = 'Worked' THEN {PaidHours} * {HourlyRate} END), 0)";
 
-    private string DeptFilter => DepartmentId != null ? $" AND {ShiftDept} = @dept" : "";
-    private string ShiftWhere => "s.Shift_Date >= @from AND s.Shift_Date < @to AND s.Shift_Date <= CURDATE()" + DeptFilter;
+    private string DeptFilter => (DepartmentId != null ? $" AND {ShiftDept} = @dept" : "")
+                                 + (EmployeeId != null ? " AND s.Employee_ID = @emp" : "");
+    private string ShiftWhere => "s.Shift_Date >= @from AND s.Shift_Date < @to AND s.Shift_Date <= @today" + DeptFilter;
 
     protected override async Task LoadFiltersAsync(MySqlConnection conn)
     {
         _departments = await LoadOptionsAsync(conn, "SELECT Department_ID, Department_Name FROM Department ORDER BY Department_Name");
         Filters.Add(new FilterField(nameof(DepartmentId), "Department", _departments, DepartmentId?.ToString()));
+        _employees = await LoadOptionsAsync(conn, @"
+            SELECT Employee_ID, CONCAT(First_Name, ' ', Last_Name) FROM Employee ORDER BY First_Name, Last_Name");
+        Filters.Add(new FilterField(nameof(EmployeeId), "Employee", _employees, EmployeeId?.ToString()));
     }
 
     private MySqlCommand Cmd(MySqlConnection conn, string sql)
@@ -52,6 +58,7 @@ public class StaffingModel : RunnableReport
         var cmd = new MySqlCommand(sql, conn);
         AddDateParams(cmd);
         if (DepartmentId != null) cmd.Parameters.AddWithValue("@dept", DepartmentId);
+        if (EmployeeId != null) cmd.Parameters.AddWithValue("@emp", EmployeeId);
         return cmd;
     }
 
@@ -246,7 +253,7 @@ public class StaffingModel : RunnableReport
             SELECT d.Department_ID, d.Department_Name, COUNT(*) / COUNT(DISTINCT s.Shift_Date)
             {ShiftFrom}
             JOIN Department d ON d.Department_ID = {ShiftDept}
-            WHERE s.Status = 'Worked' AND s.Shift_Date BETWEEN CURDATE() - INTERVAL 28 DAY AND CURDATE() - INTERVAL 1 DAY {DeptFilter}
+            WHERE s.Status = 'Worked' AND s.Shift_Date BETWEEN @today - INTERVAL 28 DAY AND @today - INTERVAL 1 DAY {DeptFilter}
             GROUP BY d.Department_ID, d.Department_Name"))
         await using (var r = await cmd.ExecuteReaderAsync())
             while (await r.ReadAsync()) { depts[r.GetInt32(0)] = r.GetString(1); usual[r.GetInt32(0)] = Math.Round(Dec(r, 2), 1); }
@@ -256,7 +263,7 @@ public class StaffingModel : RunnableReport
             SELECT d.Department_ID, d.Department_Name, s.Shift_Date, COUNT(*)
             {ShiftFrom}
             JOIN Department d ON d.Department_ID = {ShiftDept}
-            WHERE s.Status <> 'Absent' AND s.Shift_Date BETWEEN CURDATE() AND CURDATE() + INTERVAL 6 DAY {DeptFilter}
+            WHERE s.Status <> 'Absent' AND s.Shift_Date BETWEEN @today AND @today + INTERVAL 6 DAY {DeptFilter}
             GROUP BY d.Department_ID, d.Department_Name, s.Shift_Date"))
         await using (var r = await cmd.ExecuteReaderAsync())
             while (await r.ReadAsync()) { depts[r.GetInt32(0)] = r.GetString(1); scheduled[(r.GetInt32(0), r.GetDateTime(2).Date)] = Int(r, 3); }
@@ -375,8 +382,9 @@ public class StaffingModel : RunnableReport
             JOIN Employee e ON e.Employee_ID = ct.Assigned_Employee_ID
             LEFT JOIN Animal a ON a.Animal_ID = ct.Animal_ID
             WHERE e.Department_ID = @k AND ct.Status IN ('Open', 'In Progress')
-            ORDER BY (ct.Due_At < NOW()) DESC, FIELD(ct.Priority, 'Urgent', 'High', 'Normal', 'Low'), ct.Due_At", conn);
+            ORDER BY (ct.Due_At < @now) DESC, FIELD(ct.Priority, 'Urgent', 'High', 'Normal', 'Low'), ct.Due_At", conn);
         cmd.Parameters.AddWithValue("@k", IntOrNull(text) ?? 0);
+        cmd.Parameters.AddWithValue("@now", DateTime.Now);
         await using var r = await cmd.ExecuteReaderAsync();
         while (await r.ReadAsync())
         {

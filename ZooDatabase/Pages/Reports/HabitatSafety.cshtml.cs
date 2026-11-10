@@ -232,7 +232,7 @@ public class HabitatSafetyModel : RunnableReport
                    CONCAT(emp.First_Name, ' ', emp.Last_Name), m.Maintenance_ID, m.Priority, m.Status,
                    CASE WHEN m.Maintenance_ID IS NULL THEN NULL
                         WHEN m.Status = 'Completed' THEN DATEDIFF(m.Completion_Date, m.Request_Date)
-                        ELSE DATEDIFF(CURDATE(), m.Request_Date) END
+                        ELSE DATEDIFF(@today, m.Request_Date) END
             FROM Habitat_Inspection i
             JOIN Enclosure e ON e.Enclosure_ID = i.Enclosure_ID
             LEFT JOIN Employee emp ON emp.Employee_ID = i.Inspector_Employee_ID
@@ -265,7 +265,7 @@ public class HabitatSafetyModel : RunnableReport
                       new Col("Status"), new Col("Requested"), new Col("Days open", true), new Col("Assigned to"));
         await using var cmd = Cmd(conn, $@"
             SELECT m.Maintenance_ID, e.Enclosure_ID, e.Enclosure_Name, m.Description, m.Priority, COALESCE(m.Status, 'Open'),
-                   m.Request_Date, DATEDIFF(CURDATE(), m.Request_Date), CONCAT(emp.First_Name, ' ', emp.Last_Name)
+                   m.Request_Date, DATEDIFF(@today, m.Request_Date), CONCAT(emp.First_Name, ' ', emp.Last_Name)
             FROM Maintenance m
             JOIN Enclosure e ON e.Enclosure_ID = m.Enclosure_ID
             LEFT JOIN Employee emp ON emp.Employee_ID = m.Employee_ID

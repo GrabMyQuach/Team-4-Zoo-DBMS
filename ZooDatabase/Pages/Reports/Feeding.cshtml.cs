@@ -29,9 +29,11 @@ public class FeedingModel : RunnableReport
 
     [BindProperty(SupportsGet = true)] public int? EnclosureId { get; set; }
     [BindProperty(SupportsGet = true)] public int? KeeperId { get; set; }
+    [BindProperty(SupportsGet = true)] public int? AnimalId { get; set; }
 
     private List<Option> _enclosures = new();
     private List<Option> _keepers = new();
+    private List<Option> _animals = new();
 
     private DateTime RecentStart => EndDate.AddDays(-6);
 
@@ -53,6 +55,8 @@ public class FeedingModel : RunnableReport
             FROM Keeper k JOIN Employee e ON e.Employee_ID = k.Employee_ID ORDER BY e.Last_Name");
         Filters.Add(new FilterField(nameof(EnclosureId), "Enclosure", _enclosures, EnclosureId?.ToString()));
         Filters.Add(new FilterField(nameof(KeeperId), "Keeper", _keepers, KeeperId?.ToString()));
+        _animals = await LoadAnimalOptionsAsync(conn);
+        Filters.Add(new FilterField(nameof(AnimalId), "Animal", _animals, AnimalId?.ToString()));
     }
 
     private string FilterSql()
@@ -60,6 +64,7 @@ public class FeedingModel : RunnableReport
         var f = "";
         if (EnclosureId != null) f += " AND a.Enclosure_ID = @enclosure";
         if (KeeperId != null) f += " AND fs.Keeper_Employee_ID = @keeper";
+        if (AnimalId != null) f += " AND a.Animal_ID = @animal";
         return f;
     }
 
@@ -81,6 +86,7 @@ public class FeedingModel : RunnableReport
         cmd.Parameters.AddWithValue("@recent", RecentStart);
         if (EnclosureId != null) cmd.Parameters.AddWithValue("@enclosure", EnclosureId);
         if (KeeperId != null) cmd.Parameters.AddWithValue("@keeper", KeeperId);
+        if (AnimalId != null) cmd.Parameters.AddWithValue("@animal", AnimalId);
         return cmd;
     }
 
@@ -207,16 +213,18 @@ public class FeedingModel : RunnableReport
         var t = Table(new Col("Feed"), new Col("Supplier"), new Col("In stock", true), new Col("Daily use", true),
                       new Col("Days left", true), new Col("Used in range", true), new Col("Cost in range", true),
                       new Col("Open orders", true), new Col("Status"));
-        await using var cmd = Cmd(conn, @"
+        await using var cmd = Cmd(conn, $@"
             SELECT f.Feed_ID, f.Feed_Name, sup.Supplier_Name, f.Unit, f.Quantity_In_Stock, f.Reorder_Level, f.Unit_Cost, f.Expiration_Date,
                    (SELECT COALESCE(SUM(fs.Quantity), 0) FROM Feeding_Schedule fs JOIN Animal a ON a.Animal_ID = fs.Animal_ID
                      WHERE fs.Feed_ID = f.Feed_ID AND fs.Is_Active = 1 AND a.Is_Active = 1),
                    (SELECT COALESCE(SUM(COALESCE(fl.Quantity_Given, IF(fl.Status = 'Completed', fs.Quantity, 0))), 0)
                      FROM Feeding_Log fl JOIN Feeding_Schedule fs ON fs.Schedule_ID = fl.Schedule_ID
-                     WHERE fs.Feed_ID = f.Feed_ID AND fl.Feeding_Date >= @from AND fl.Feeding_Date < @to),
+                     WHERE fs.Feed_ID = f.Feed_ID AND fl.Feeding_Date >= @from AND fl.Feeding_Date < @to
+                       {(AnimalId != null ? "AND fs.Animal_ID = @animal" : "")}),
                    (SELECT COUNT(*) FROM Purchase_Order po WHERE po.Feed_ID = f.Feed_ID AND po.Status IN ('Draft', 'Ordered'))
             FROM Feed f
             LEFT JOIN Supplier sup ON sup.Supplier_ID = f.Supplier_ID
+            {(AnimalId != null ? "WHERE f.Feed_ID IN (SELECT x.Feed_ID FROM Feeding_Schedule x WHERE x.Animal_ID = @animal)" : "")}
             ORDER BY f.Feed_Name");
         await using var r = await cmd.ExecuteReaderAsync();
         while (await r.ReadAsync())
@@ -244,7 +252,8 @@ public class FeedingModel : RunnableReport
                 T(problems.Count == 0 ? "OK" : string.Join("; ", problems))
             }, problems.Any(p => p.StartsWith("Under") || p == "Expired") ? "bad" : problems.Count > 0 ? "warn" : null));
         }
-        t.Note = "Stock and days left are as of today. Click Used in range to see the feedings, or Open orders to see the purchase orders.";
+        t.Note = (AnimalId != null ? "Showing only the feeds this animal eats, and how much of each it used. " : "")
+                 + "Stock and days left are as of today. Click Used in range to see the feedings, or Open orders to see the purchase orders.";
         return t;
     }
 
