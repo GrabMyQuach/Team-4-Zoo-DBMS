@@ -1,6 +1,6 @@
 @using ZooDatabase.Data
 @{
-    // Left "Main menu" (like CPOMS): Home, Reports, Admin.
+    // Left "Main menu" (like CPOMS): Home, the zoo sections, Reports, Admin.
     // Each user only sees the items their role can open.
     var path = (Context.Request.Path.Value ?? "/").TrimEnd('/');
     if (path == "") { path = "/"; }
@@ -25,6 +25,13 @@
     <div class="module-title">Main menu</div>
     <nav class="nav flex-column">
         <a class="nav-link @(inProducts ? "active" : "")" href="/Dashboard">Home</a>
+
+        @* The same sections as the "Go to" cards on the home page *@
+        @foreach (var m in ZooModules.All)
+        {
+            if (!ZooModules.CanSee(User, m.Key)) { continue; }
+            <a class="nav-link" href="/@m.Key">@m.Title</a>
+        }
 
         @if (ReportAccess.CanView(User))
         {

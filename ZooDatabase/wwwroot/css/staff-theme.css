@@ -378,3 +378,11 @@ fieldset legend.form-label { font-size: 1rem; float: none; }
 .report-finding-list li.finding-good::before { background: #1e7b45; }
 .report-finding-list li.finding-bad::before { background: #b42318; }
 @media print { .kpi-tile { break-inside: avoid; } }
+
+/* "Other sections" list under a section's sidebar */
+.module-sidebar .other-sections-title { margin-top: 18px; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--z-muted, #6b7a75); }
+.module-sidebar .other-sections .nav-link { font-size: .92rem; padding-top: 5px; padding-bottom: 5px; }
+@media (max-width: 767.98px) {
+    /* Phones: keep the sidebar to one row; "← Main Menu" still gets you to the other sections */
+    .module-sidebar .other-sections-title, .module-sidebar .other-sections { display: none; }
+}

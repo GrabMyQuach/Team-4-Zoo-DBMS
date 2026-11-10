@@ -24,13 +24,7 @@ public class IndexModel : PageModel
     public bool ShowTasks { get; set; }
 
     // Same rules the sidebar and module pages use
-    public bool CanSee(string moduleKey)
-    {
-        if (User.IsInRole("ReadOnly") && (moduleKey == "Staff" || moduleKey == "Finance")) return false;
-        if ((User.IsInRole("Zookeeper") || User.IsInRole("Veterinarian")) && moduleKey != "Animals") return false;
-        if (User.IsInRole("Cashier") && moduleKey != "Tickets") return false;
-        return true;
-    }
+    public bool CanSee(string moduleKey) => ZooModules.CanSee(User, moduleKey);
 
     // Cashiers skip the dashboard and land on their register
     public override void OnPageHandlerExecuting(Microsoft.AspNetCore.Mvc.Filters.PageHandlerExecutingContext context)

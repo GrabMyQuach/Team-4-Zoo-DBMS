@@ -48,6 +48,15 @@ public static class ZooModules
         })
     };
 
+    // Which sections a user can open (used by the home page cards and the main menu)
+    public static bool CanSee(System.Security.Claims.ClaimsPrincipal user, string moduleKey)
+    {
+        if (user.IsInRole("ReadOnly") && (moduleKey == "Staff" || moduleKey == "Finance")) return false;
+        if ((user.IsInRole("Zookeeper") || user.IsInRole("Veterinarian")) && moduleKey != "Animals") return false;
+        if (user.IsInRole("Cashier") && moduleKey != "Tickets") return false;
+        return true;
+    }
+
     // Find a section by its key, like "Animals"
     public static ZooModule? Find(string? key) =>
         All.FirstOrDefault(m => string.Equals(m.Key, key, StringComparison.OrdinalIgnoreCase));

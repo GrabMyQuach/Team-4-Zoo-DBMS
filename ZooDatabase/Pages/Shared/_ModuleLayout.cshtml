@@ -112,6 +112,19 @@
                 }
 
             </nav>
+
+            @* Jump straight to another section without going back to the home page *@
+            @{ var others = ZooModules.All.Where(m => m != module && ZooModules.CanSee(User, m.Key)).ToList(); }
+            @if (others.Count > 0)
+            {
+                <div class="module-title other-sections-title">Other sections</div>
+                <nav class="nav flex-column other-sections">
+                    @foreach (var m in others)
+                    {
+                        <a class="nav-link" href="/@m.Key">@m.Title</a>
+                    }
+                </nav>
+            }
             <a href="/Dashboard" class="back-link">← Main Menu</a>
         </div>
     </aside>
