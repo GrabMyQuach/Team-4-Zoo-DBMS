@@ -32,6 +32,7 @@ public class FeedingNewModel : PageModel
     public List<ScheduleOption> Schedules { get; set; } = new();
     public List<EmployeeOption> Keepers { get; set; } = new();
     public string? ErrorMessage { get; set; }
+    public List<FeedingUndo.Entry> Recent { get; set; } = new();
 
     public async Task<IActionResult> OnGetAsync(int? schedule)
     {
@@ -121,6 +122,15 @@ public class FeedingNewModel : PageModel
         }
     }
 
+    // Undo a feeding logged by mistake (puts the feed back in stock, cancels tasks it made)
+    public async Task<IActionResult> OnPostUndoAsync(int logId)
+    {
+        await using var conn = new MySqlConnection(_config.GetConnectionString("ZooDb"));
+        await conn.OpenAsync();
+        TempData["Success"] = await FeedingUndo.UndoAsync(conn, logId, Id) ?? "That feeding was already removed.";
+        return Redirect($"/Animals/FeedingNew/{Id}");
+    }
+
     // Read back what the triggers did so staff can see it
     private async Task<string> DescribeResultAsync(MySqlConnection conn, long logId, ScheduleOption schedule, int draftsBefore)
     {
@@ -179,6 +189,7 @@ public class FeedingNewModel : PageModel
     {
         Schedules.Clear();
         Keepers.Clear();
+        Recent = await FeedingUndo.RecentAsync(conn, Id);
 
         // This animal's active feedings, and whether each is already logged today
         await using (var cmd = new MySqlCommand(@"

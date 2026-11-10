@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using MySqlConnector;
+using ZooDatabase.Data;
 
 namespace ZooDatabase.Pages.Shop;
 
@@ -23,6 +24,7 @@ public class SaleDetailsModel : PageModel
     public string? Payment { get; set; }
     public decimal Total { get; set; }
     public List<(int ItemId, string Name, int Qty, decimal Price)> Items { get; set; } = new();
+    public bool CanVoid => SalesOptions.CanVoid(User);
 
     public async Task<IActionResult> OnGetAsync()
     {
@@ -68,5 +70,58 @@ public class SaleDetailsModel : PageModel
                 Items.Add((Convert.ToInt32(r.GetValue(0)), r.GetString(1), r.GetInt32(2), r.GetDecimal(3)));
         }
         return Page();
+    }
+
+    // Void (undo) the whole sale. Deleting each item fires the sale_item_deleted trigger,
+    // which puts gift shop stock back on the shelf; then the empty sale is removed.
+    public async Task<IActionResult> OnPostVoidAsync()
+    {
+        if (!CanVoid) return Forbid();
+
+        await using var conn = new MySqlConnection(_config.GetConnectionString("ZooDb"));
+        await conn.OpenAsync();
+        await using var tx = await conn.BeginTransactionAsync();
+
+        decimal total;
+        await using (var cmd = new MySqlCommand("SELECT Total_Amount FROM Sale WHERE Sale_ID = @id FOR UPDATE", conn, tx))
+        {
+            cmd.Parameters.AddWithValue("@id", Id);
+            var v = await cmd.ExecuteScalarAsync();
+            if (v == null)
+            {
+                TempData["Success"] = $"Sale #{Id} was already voided.";
+                return Redirect("/Shop/Sales");
+            }
+            total = Convert.ToDecimal(v);
+        }
+
+        int restocked;
+        await using (var cmd = new MySqlCommand(
+            "SELECT COALESCE(SUM(Quantity), 0) FROM Sale_Item WHERE Sale_ID = @id AND Product_ID IS NOT NULL", conn, tx))
+        {
+            cmd.Parameters.AddWithValue("@id", Id);
+            restocked = Convert.ToInt32(await cmd.ExecuteScalarAsync());
+        }
+
+        try
+        {
+            foreach (var sql in new[] { "DELETE FROM Sale_Item WHERE Sale_ID = @id", "DELETE FROM Sale WHERE Sale_ID = @id" })
+            {
+                await using var cmd = new MySqlCommand(sql, conn, tx);
+                cmd.Parameters.AddWithValue("@id", Id);
+                await cmd.ExecuteNonQueryAsync();
+            }
+            await tx.CommitAsync();
+        }
+        catch (MySqlException ex) when (ex.SqlState == "45000")
+        {
+            await tx.RollbackAsync();
+            TempData["Error"] = "Couldn't void this sale: " + ex.Message;
+            return Redirect($"/Shop/SaleDetails/{Id}");
+        }
+
+        TempData["Success"] = $"Sale #{Id} ({total:C}) was voided."
+            + (restocked > 0 ? $" {restocked} item(s) were put back in stock." : "");
+        return Redirect("/Shop/Sales");
     }
 }

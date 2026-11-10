@@ -42,15 +42,6 @@
 
             <nav class="nav flex-column">
 
-                @* Customer ticket purchasing link *@
-                @if (isCustomer && module?.Key == "Tickets")
-                {
-                    <a class="nav-link @(Context.Request.Path.Value?.Equals("/Tickets/BuyTickets", StringComparison.OrdinalIgnoreCase) == true ? "active" : "")"
-                       href="/Tickets/BuyTickets">
-                        Buy Tickets
-                    </a>
-                }
-
                 @if (module != null)
                 {
                     foreach (var s in module.Sections)

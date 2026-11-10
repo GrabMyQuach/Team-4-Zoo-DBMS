@@ -12,7 +12,9 @@
     <h1 class="h2 mb-0">Record Exam: @Model.AnimalName</h1>
 </div>
 
-<div class="card" style="max-width: 760px;">
+<div class="row g-4">
+<div class="col-lg-7">
+<div class="card">
     <div class="card-body p-4">
 
         @if (Model.ErrorMessage != null)
@@ -83,6 +85,14 @@
                 <div class="col-md-6">
                     <label class="form-label fw-semibold">Weight (kg)</label>
                     <input asp-for="Input.WeightKg" type="number" step="0.01" min="0" class="form-control" />
+                    @if (Model.LastWeighed != null)
+                    {
+                        <div class="form-text">Last weight: <strong>@Model.LastWeighed.WeightKg!.Value.ToString("0.##") kg</strong> on @Model.LastWeighed.Date.ToString("MMM d, yyyy")</div>
+                    }
+                    else
+                    {
+                        <div class="form-text">No weight on record yet.</div>
+                    }
                 </div>
 
                 <div class="col-12">
@@ -97,6 +107,47 @@
             </div>
         </form>
     </div>
+</div>
+</div>
+
+<div class="col-lg-5">
+    <div class="card">
+        <div class="card-body p-4">
+            <h2 class="h5 section-heading">Previous exams</h2>
+            @if (Model.Recent.Count == 0)
+            {
+                <p class="text-muted mb-0">This is @Model.AnimalName's first exam on record.</p>
+            }
+            else
+            {
+                <ul class="list-unstyled mb-0">
+                    @foreach (var h in Model.Recent)
+                    {
+                        var sev = h.Severity switch { "Critical" => "bg-danger", "High" => "bg-warning text-dark", "Moderate" => "bg-info text-dark", _ => "bg-light text-dark border" };
+                        <li class="py-2 border-bottom">
+                            <div class="d-flex justify-content-between gap-2">
+                                <span class="fw-semibold">@h.Date.ToString("MMM d, yyyy") · @h.Type</span>
+                                <span class="badge @sev align-self-start">@h.Severity</span>
+                            </div>
+                            @if (h.Diagnosis != null)
+                            {
+                                <div>@h.Diagnosis @if (h.Contagious) { <span class="badge bg-danger ms-1">Contagious</span> }</div>
+                            }
+                            @if (h.Treatment != null) { <div class="small">Treatment: @h.Treatment</div> }
+                            <div class="small text-muted">
+                                @(h.WeightKg != null ? h.WeightKg.Value.ToString("0.##") + " kg" : "No weight")
+                                @if (h.Vet != null) { <span>· @h.Vet</span> }
+                            </div>
+                        </li>
+                    }
+                </ul>
+                <p class="small text-muted mt-2 mb-0">
+                    Entered one wrong? Delete it from the <a href="/Animals/Details/@Model.Id#health">animal's page</a>, then record it again.
+                </p>
+            }
+        </div>
+    </div>
+</div>
 </div>
 
 @{ Layout = "_ModuleLayout"; }

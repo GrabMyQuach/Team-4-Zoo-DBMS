@@ -33,6 +33,12 @@ public class HealthNewModel : PageModel
     public List<VetOption> VetOptions { get; set; } = new();
     public string? ErrorMessage { get; set; }
 
+    // The animal's last few exams, shown next to the form so the vet can compare
+    public List<PastExam> Recent { get; set; } = new();
+    public PastExam? LastWeighed { get; set; }
+    public record PastExam(DateTime Date, string Type, string? Diagnosis, string Severity, bool Contagious,
+                           decimal? WeightKg, string? Vet, string? Treatment);
+
     public async Task<IActionResult> OnGetAsync()
     {
         await using var conn = new MySqlConnection(_config.GetConnectionString("ZooDb"));
@@ -154,8 +160,44 @@ public class HealthNewModel : PageModel
         var name = await cmd.ExecuteScalarAsync();
         if (name is not string s) return false;
         AnimalName = s;
+
+        Recent.Clear();
+        await using (var hist = new MySqlCommand(@"
+            SELECT h.Exam_Date, h.Record_Type, h.Diagnosis, h.Severity, h.Is_Contagious, h.Weight_kg,
+                   CONCAT(e.First_Name, ' ', e.Last_Name), h.Treatment
+            FROM Health_Record h
+            LEFT JOIN Employee e ON e.Employee_ID = h.Vet_Employee_ID
+            WHERE h.Animal_ID = @id
+            ORDER BY h.Exam_Date DESC, h.Health_Record_ID DESC
+            LIMIT 5", conn))
+        {
+            hist.Parameters.AddWithValue("@id", Id);
+            await using var r = await hist.ExecuteReaderAsync();
+            while (await r.ReadAsync())
+                Recent.Add(ReadExam(r));
+        }
+
+        // Latest weight, even if it's older than the last 5 exams
+        LastWeighed = Recent.FirstOrDefault(x => x.WeightKg != null);
+        if (LastWeighed == null)
+        {
+            await using var w = new MySqlCommand(@"
+                SELECT h.Exam_Date, h.Record_Type, h.Diagnosis, h.Severity, h.Is_Contagious, h.Weight_kg,
+                       CONCAT(e.First_Name, ' ', e.Last_Name), h.Treatment
+                FROM Health_Record h
+                LEFT JOIN Employee e ON e.Employee_ID = h.Vet_Employee_ID
+                WHERE h.Animal_ID = @id AND h.Weight_kg IS NOT NULL
+                ORDER BY h.Exam_Date DESC LIMIT 1", conn);
+            w.Parameters.AddWithValue("@id", Id);
+            await using var r = await w.ExecuteReaderAsync();
+            if (await r.ReadAsync()) LastWeighed = ReadExam(r);
+        }
         return true;
     }
+
+    private static PastExam ReadExam(MySqlDataReader r) => new(
+        r.GetDateTime(0), r.GetString(1), r.IsDBNull(2) ? null : r.GetString(2), r.GetString(3), r.GetBoolean(4),
+        r.IsDBNull(5) ? null : r.GetDecimal(5), r.IsDBNull(6) ? null : r.GetString(6), r.IsDBNull(7) ? null : r.GetString(7));
 
     // Vets come from the Veterinarian table, since Health_Record only accepts those
     private async Task LoadVetsAsync(MySqlConnection conn)

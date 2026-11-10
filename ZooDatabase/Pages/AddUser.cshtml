@@ -33,6 +33,25 @@
             </div>
 
             <div class="mb-3">
+                <label class="form-label fw-semibold">Employee</label>
+                <select asp-for="EmployeeId" class="form-select">
+                    <option value="">Not linked to an employee</option>
+                    @foreach (var e in Model.Employees)
+                    {
+                        if (e.LinkedTo != null && e.Id != Model.EmployeeId)
+                        {
+                            <option value="@e.Id" disabled>@e.Name (already linked to @e.LinkedTo)</option>
+                        }
+                        else
+                        {
+                            <option value="@e.Id">@e.Name@(e.Job != null ? " · " + e.Job : "")</option>
+                        }
+                    }
+                </select>
+                <div class="form-text">Required for Zookeeper, Veterinarian, Cashier and Tour Guide accounts, so their pages can show their own animals, tasks and sales.</div>
+            </div>
+
+            <div class="mb-3">
                 <label class="form-label fw-semibold">Password</label>
                 <input asp-for="Password" type="password" class="form-control" />
                 <div class="form-text">At least 8 characters.</div>

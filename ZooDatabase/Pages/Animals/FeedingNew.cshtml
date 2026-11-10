@@ -12,7 +12,14 @@
     <h1 class="h2 mb-0">Log Feeding: @Model.AnimalName</h1>
 </div>
 
-<div class="card" style="max-width: 760px;">
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>
+}
+
+<div class="row g-4">
+<div class="col-lg-7">
+<div class="card">
     <div class="card-body p-4">
 
         @if (Model.ErrorMessage != null)
@@ -94,6 +101,46 @@
             </form>
         }
     </div>
+</div>
+</div>
+
+<div class="col-lg-5">
+    <div class="card">
+        <div class="card-body p-4">
+            <h2 class="h5 section-heading">Recent feedings</h2>
+            @if (Model.Recent.Count == 0)
+            {
+                <p class="text-muted mb-0">No feedings logged for @Model.AnimalName yet.</p>
+            }
+            else
+            {
+                <ul class="list-unstyled mb-0">
+                    @foreach (var f in Model.Recent)
+                    {
+                        var badge = f.Status switch { "Completed" => "bg-success", "Partial" => "bg-warning text-dark", "Refused" => "bg-danger", _ => "bg-secondary" };
+                        <li class="d-flex justify-content-between align-items-start gap-2 py-2 border-bottom">
+                            <div>
+                                <div class="fw-semibold">@f.Date.ToString("MMM d") · @f.Time @f.Feed</div>
+                                <div class="small text-muted">
+                                    <span class="badge @badge">@f.Status</span>
+                                    @if (f.Amount != null) { <span>@f.Amount.Value.ToString("0.##") @f.Unit</span> }
+                                    @if (f.By != null) { <span>· @f.By</span> }
+                                </div>
+                                @if (f.Notes != null) { <div class="small text-muted fst-italic">@f.Notes</div> }
+                            </div>
+                            <form method="post" asp-page-handler="Undo" asp-route-id="@Model.Id"
+                                  onsubmit="return confirm('Undo the @f.Time feeding on @f.Date.ToString("MMM d")?@(f.Amount != null ? " The feed goes back in stock." : "")');">
+                                <input type="hidden" name="logId" value="@f.LogId" />
+                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill">Undo</button>
+                            </form>
+                        </li>
+                    }
+                </ul>
+                <p class="small text-muted mt-2 mb-0">Logged one by mistake? Undo it, then log it again.</p>
+            }
+        </div>
+    </div>
+</div>
 </div>
 
 @{ Layout = "_ModuleLayout"; }

@@ -15,7 +15,14 @@
     }
 </div>
 
-<div class="card" style="max-width: 760px;">
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">@TempData["Error"]</div>
+}
+
+<div class="row g-4">
+<div class="col-lg-7">
+<div class="card">
     <div class="card-body p-4">
 
         @if (Model.ErrorMessage != null)
@@ -115,5 +122,63 @@
                 <a href="/Staff/Maintenance" class="btn btn-outline-secondary rounded-pill px-4">Cancel</a>
             </div>
         </form>
+
+        @if (!Model.IsNew)
+        {
+            <form method="post" asp-page-handler="Delete" asp-route-id="@Model.Id" class="mt-4 pt-3 border-top"
+                  onsubmit="return confirm('Delete request #@Model.Id? This cannot be undone.');">
+                <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3">Delete this request</button>
+                <span class="form-text ms-2">Only for requests entered by mistake. Finished work should be marked Completed.</span>
+            </form>
+        }
     </div>
 </div>
+</div>
+
+<div class="col-lg-5">
+    <div class="card">
+        <div class="card-body p-4">
+            <h2 class="h5 section-heading">Earlier requests here</h2>
+            <p id="history-empty" class="text-muted mb-0">Choose a place to see its past maintenance.</p>
+            @foreach (var (place, list) in Model.History)
+            {
+                <ul class="list-unstyled mb-0 d-none" data-history="@place">
+                    @foreach (var h in list)
+                    {
+                        var badge = h.Status switch { "Completed" => "bg-success", "In Progress" => "bg-info text-dark", "Cancelled" => "bg-secondary", _ => "bg-warning text-dark" };
+                        <li class="py-2 border-bottom">
+                            <div class="d-flex justify-content-between gap-2">
+                                <a href="/Staff/MaintenanceEdit/@h.Id" class="fw-semibold">#@h.Id @h.Description</a>
+                                <span class="badge @badge align-self-start">@h.Status</span>
+                            </div>
+                            <div class="small text-muted">
+                                @(h.Requested?.ToString("MMM d, yyyy") ?? "No date")
+                                @if (h.Completed != null) { <span>→ done @h.Completed.Value.ToString("MMM d")</span> }
+                                · @h.Priority
+                                @if (h.Cost != null) { <span>· @h.Cost.Value.ToString("C")</span> }
+                                @if (h.AssignedTo != null) { <span>· @h.AssignedTo</span> }
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+            <p id="history-none" class="text-muted mb-0 d-none">No earlier requests for this place.</p>
+        </div>
+    </div>
+</div>
+</div>
+
+<script>
+    (function () {
+        const select = document.getElementById('Input_Place');
+        const lists = document.querySelectorAll('[data-history]');
+        function show() {
+            let found = false;
+            lists.forEach(l => { const on = l.dataset.history === select.value; l.classList.toggle('d-none', !on); found ||= on; });
+            document.getElementById('history-empty').classList.toggle('d-none', select.value !== '');
+            document.getElementById('history-none').classList.toggle('d-none', select.value === '' || found);
+        }
+        select.addEventListener('change', show);
+        show();
+    })();
+</script>

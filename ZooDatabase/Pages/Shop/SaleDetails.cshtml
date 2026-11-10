@@ -11,6 +11,10 @@
 {
     <div class="alert alert-success">@TempData["Success"]</div>
 }
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">@TempData["Error"]</div>
+}
 
 <div class="border-bottom pb-3 mb-4">
     <h1 class="h2 mb-1">Sale #@Model.Id</h1>
@@ -83,5 +87,18 @@
                 </dl>
             </div>
         </div>
+        @if (Model.CanVoid)
+        {
+            <div class="card mt-3">
+                <div class="card-body p-4">
+                    <h2 class="h6 mb-1">Rung up by mistake?</h2>
+                    <p class="text-muted small mb-3">Voiding removes this sale and its total from the reports@(isFood ? "" : " and puts the items back in stock").</p>
+                    <form method="post" asp-page-handler="Void" asp-route-id="@Model.Id"
+                          onsubmit="return confirm('Void sale #@Model.Id for @Model.Total.ToString("C")? This cannot be undone.');">
+                        <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill px-3">Void this sale</button>
+                    </form>
+                </div>
+            </div>
+        }
     </div>
 </div>

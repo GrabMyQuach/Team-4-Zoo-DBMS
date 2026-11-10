@@ -31,6 +31,9 @@ public class MaintenanceEditModel : PageModel
     public int? InspectionId { get; set; }
     public string? ErrorMessage { get; set; }
 
+    // Earlier requests for each place (key "E:3" etc.), so staff can see what was done before
+    public Dictionary<string, List<PastRequest>> History { get; set; } = new();
+
     public bool IsNew => Id == null;
 
     public async Task<IActionResult> OnGetAsync()
@@ -168,6 +171,61 @@ public class MaintenanceEditModel : PageModel
         }
     }
 
+    // Delete a request entered by mistake. Repairs opened by a critical inspection are kept:
+    // they are what keeps the enclosure closed, so they should be finished, not deleted.
+    public async Task<IActionResult> OnPostDeleteAsync()
+    {
+        if (IsNew) return NotFound();
+        await using var conn = new MySqlConnection(_config.GetConnectionString("ZooDb"));
+        await conn.OpenAsync();
+        await using var tx = await conn.BeginTransactionAsync();
+
+        string? desc;
+        int? inspection;
+        string? status;
+        await using (var cmd = new MySqlCommand(
+            "SELECT Description, Inspection_ID, Status FROM Maintenance WHERE Maintenance_ID = @id FOR UPDATE", conn, tx))
+        {
+            cmd.Parameters.AddWithValue("@id", Id);
+            await using var r = await cmd.ExecuteReaderAsync();
+            if (!await r.ReadAsync())
+            {
+                TempData["Success"] = $"Request #{Id} was already deleted.";
+                return Redirect("/Staff/Maintenance");
+            }
+            desc = r.IsDBNull(0) ? null : r.GetString(0);
+            inspection = r.IsDBNull(1) ? null : r.GetInt32(1);
+            status = r.IsDBNull(2) ? null : r.GetString(2);
+        }
+
+        if (inspection != null && status != "Completed")
+        {
+            await tx.RollbackAsync();
+            TempData["Error"] = $"Request #{Id} was opened by critical inspection #{inspection} and is what keeps the enclosure closed. " +
+                                "Mark it Completed when the work is done instead of deleting it.";
+            return Redirect($"/Staff/MaintenanceEdit/{Id}");
+        }
+
+        int tasks;
+        await using (var cmd = new MySqlCommand(@"
+            UPDATE Care_Task SET Status = 'Cancelled', Completed_At = NOW()
+            WHERE Source_Type = 'Maintenance' AND Source_ID = @id AND Status IN ('Open', 'In Progress')", conn, tx))
+        {
+            cmd.Parameters.AddWithValue("@id", Id);
+            tasks = await cmd.ExecuteNonQueryAsync();
+        }
+        await using (var cmd = new MySqlCommand("DELETE FROM Maintenance WHERE Maintenance_ID = @id", conn, tx))
+        {
+            cmd.Parameters.AddWithValue("@id", Id);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        await tx.CommitAsync();
+
+        TempData["Success"] = $"Request #{Id} ({desc}) was deleted."
+            + (tasks > 0 ? $" {tasks} open task(s) it created were cancelled." : "");
+        return Redirect("/Staff/Maintenance");
+    }
+
     // Say what was saved, and what the trigger did if an emergency repair was just finished
     private async Task<string> DescribeResultAsync(MySqlConnection conn, long maintenanceId, string? oldStatus, bool isEnclosure)
     {
@@ -244,6 +302,40 @@ public class MaintenanceEditModel : PageModel
     {
         PlaceGroups.Clear();
         EmployeeOptions.Clear();
+        History.Clear();
+
+        // The last 5 requests for every place (not counting the one being edited)
+        await using (var cmd = new MySqlCommand(@"
+            SELECT k, Maintenance_ID, Description, Request_Date, Completion_Date, Status, Priority, Cost, Who
+            FROM (
+                SELECT CASE WHEN m.Enclosure_ID IS NOT NULL THEN CONCAT('E:', m.Enclosure_ID)
+                            WHEN m.Attraction_ID IS NOT NULL THEN CONCAT('A:', m.Attraction_ID)
+                            WHEN m.Stand_ID IS NOT NULL THEN CONCAT('S:', m.Stand_ID)
+                            ELSE CONCAT('G:', m.GiftShop_ID) END AS k,
+                       m.Maintenance_ID, m.Description, m.Request_Date, m.Completion_Date, m.Status, m.Priority, m.Cost,
+                       CONCAT(e.First_Name, ' ', e.Last_Name) AS Who,
+                       ROW_NUMBER() OVER (PARTITION BY m.Enclosure_ID, m.Attraction_ID, m.Stand_ID, m.GiftShop_ID
+                                          ORDER BY m.Request_Date DESC, m.Maintenance_ID DESC) AS rn
+                FROM Maintenance m
+                LEFT JOIN Employee e ON e.Employee_ID = m.Employee_ID
+                WHERE COALESCE(m.Enclosure_ID, m.Attraction_ID, m.Stand_ID, m.GiftShop_ID) IS NOT NULL
+                  AND (@id IS NULL OR m.Maintenance_ID <> @id)
+            ) x
+            WHERE rn <= 5
+            ORDER BY k, rn", conn))
+        {
+            cmd.Parameters.AddWithValue("@id", (object?)Id ?? DBNull.Value);
+            await using var r = await cmd.ExecuteReaderAsync();
+            while (await r.ReadAsync())
+            {
+                var key = r.GetString(0);
+                if (!History.TryGetValue(key, out var list)) History[key] = list = new();
+                list.Add(new PastRequest(r.GetInt32(1), r.IsDBNull(2) ? "" : r.GetString(2),
+                    r.IsDBNull(3) ? null : r.GetDateTime(3), r.IsDBNull(4) ? null : r.GetDateTime(4),
+                    r.IsDBNull(5) ? "" : r.GetString(5), r.GetString(6),
+                    r.IsDBNull(7) ? null : r.GetDecimal(7), r.IsDBNull(8) ? null : r.GetString(8)));
+            }
+        }
 
         var sources = new (string Label, string Prefix, string Sql)[]
         {
@@ -279,6 +371,8 @@ public class MaintenanceEditModel : PageModel
     }
 
     public record Option(int Id, string Label);
+    public record PastRequest(int Id, string Description, DateTime? Requested, DateTime? Completed,
+                              string Status, string Priority, decimal? Cost, string? AssignedTo);
     public record PlaceOption(string Value, string Label);
     public record PlaceGroup(string Label, List<PlaceOption> Places);
 

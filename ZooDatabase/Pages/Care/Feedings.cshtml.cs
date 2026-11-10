@@ -73,6 +73,23 @@ public class FeedingsModel : PageModel
         return Redirect("/Care/Feedings");
     }
 
+    // Undo today's log for one of my feedings (a mis-tap), so it can be logged again
+    public async Task<IActionResult> OnPostUndoAsync(int scheduleId)
+    {
+        await using var conn = await CareData.OpenAsync(_config);
+        await LoadAsync(conn, await CareData.MeAsync(conn, User));
+        if (Feedings.All(x => x.ScheduleId != scheduleId)) return Redirect("/Care/Feedings");
+
+        await using var cmd = new MySqlCommand(
+            "SELECT Feeding_Log_ID FROM Feeding_Log WHERE Schedule_ID = @s AND Feeding_Date = @today LIMIT 1", conn);
+        cmd.Parameters.AddWithValue("@s", scheduleId);
+        cmd.Parameters.AddWithValue("@today", DateTime.Today);
+        var logId = await cmd.ExecuteScalarAsync();
+        if (logId != null)
+            TempData["Done"] = await FeedingUndo.UndoAsync(conn, Convert.ToInt32(logId));
+        return Redirect($"/Care/Feedings#feed-{scheduleId}");
+    }
+
     public static string Clock(TimeSpan t) => DateTime.Today.Add(t).ToString("h:mm tt");
 
     private async Task LoadAsync(MySqlConnection conn, int? me)

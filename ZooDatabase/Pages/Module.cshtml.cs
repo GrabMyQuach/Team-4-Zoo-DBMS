@@ -37,12 +37,6 @@ public class ModuleModel : PageModel
             return Forbid();
         }
 
-        
-        // Customers should go directly to Buy Tickets.
-        if (role == "Customer" && m.Key == "Tickets")
-        {
-            return Redirect("/Tickets/BuyTickets");
-        }
         if (section == null)
         {
             return Redirect($"/{m.Key}/{m.Sections[0].Slug}");

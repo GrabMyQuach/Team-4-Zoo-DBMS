@@ -51,7 +51,14 @@
             </div>
             @if (f.Logged != null)
             {
-                <span class="badge @badge care-status">@(f.Logged == "Completed" ? "Ate it" : f.Logged)</span>
+                <span class="care-status d-inline-flex align-items-center gap-2">
+                    <span class="badge @badge">@(f.Logged == "Completed" ? "Ate it" : f.Logged)</span>
+                    <form method="post" asp-page-handler="Undo" class="d-inline"
+                          onsubmit="return confirm('Undo this feeding log?');">
+                        <input type="hidden" name="scheduleId" value="@f.ScheduleId" />
+                        <button type="submit" class="btn btn-sm btn-link text-danger p-0">Undo</button>
+                    </form>
+                </span>
             }
             else
             {

@@ -69,5 +69,18 @@
                 </dl>
             </div>
         </div>
+        @if (Model.CanVoid)
+        {
+            <div class="card mt-3">
+                <div class="card-body p-4">
+                    <h2 class="h6 mb-1">Sold by mistake or refunded?</h2>
+                    <p class="text-muted small mb-3">Voiding removes this order and its total from the reports.</p>
+                    <form method="post" asp-page-handler="Void" asp-route-id="@Model.Id"
+                          onsubmit="return confirm('Void ticket order #@Model.Id for @Model.Total.ToString("C")? This cannot be undone.');">
+                        <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill px-3">Void this order</button>
+                    </form>
+                </div>
+            </div>
+        }
     </div>
 </div>

@@ -39,6 +39,25 @@
                 </select>
             </div>
 
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Employee</label>
+                <select asp-for="EmployeeId" class="form-select">
+                    <option value="">Not linked to an employee</option>
+                    @foreach (var e in Model.Employees)
+                    {
+                        if (e.LinkedTo != null && e.Id != Model.EmployeeId)
+                        {
+                            <option value="@e.Id" disabled>@e.Name (already linked to @e.LinkedTo)</option>
+                        }
+                        else
+                        {
+                            <option value="@e.Id">@e.Name@(e.Job != null ? " · " + e.Job : "")</option>
+                        }
+                    }
+                </select>
+                <div class="form-text">Required for Zookeeper, Veterinarian, Cashier and Tour Guide accounts, so their pages can show their own animals, tasks and sales.</div>
+            </div>
+
             <div class="form-check form-switch mb-4">
                 <input asp-for="IsActive" class="form-check-input" role="switch" />
                 <label asp-for="IsActive" class="form-check-label">Account is active</label>

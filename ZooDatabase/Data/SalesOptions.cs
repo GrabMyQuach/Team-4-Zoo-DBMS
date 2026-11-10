@@ -16,6 +16,10 @@ public static class SalesOptions
 
     public static bool CanBookEncounter(ClaimsPrincipal user) => EncounterRoles.Split(',').Any(user.IsInRole);
 
+    // Who can void (undo) a food, gift shop or ticket sale that was rung up by mistake
+    public const string VoidRoles = "DBA,SuperUser,Admin";
+    public static bool CanVoid(ClaimsPrincipal user) => VoidRoles.Split(',').Any(user.IsInRole);
+
     public static bool CanSell(ClaimsPrincipal user) => SalesRoles.Split(',').Any(user.IsInRole);
     public static bool CanManage(ClaimsPrincipal user) => user.IsInRole("DBA");
 

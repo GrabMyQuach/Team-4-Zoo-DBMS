@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using MySqlConnector;
+using ZooDatabase.Data;
 
 namespace ZooDatabase.Pages.Tickets;
 
@@ -24,6 +25,7 @@ public class TicketSaleDetailsModel : PageModel
     public decimal Total { get; set; }
     public string? Membership { get; set; }
     public List<ItemRow> Items { get; set; } = new();
+    public bool CanVoid => SalesOptions.CanVoid(User);
 
     public async Task<IActionResult> OnGetAsync()
     {
@@ -68,6 +70,46 @@ public class TicketSaleDetailsModel : PageModel
         }
 
         return Page();
+    }
+
+    // Void (undo) the whole ticket order. Each ticket line is deleted first so the
+    // ticket_item_deleted trigger keeps the total right, then the empty order is removed.
+    public async Task<IActionResult> OnPostVoidAsync()
+    {
+        if (!CanVoid) return Forbid();
+
+        await using var conn = new MySqlConnection(_config.GetConnectionString("ZooDb"));
+        await conn.OpenAsync();
+        await using var tx = await conn.BeginTransactionAsync();
+
+        decimal total;
+        int tickets;
+        await using (var cmd = new MySqlCommand(@"
+            SELECT ts.Total_Amount, (SELECT COALESCE(SUM(Quantity), 0) FROM Ticket_Purchase_Item i WHERE i.TicketPurchase_ID = ts.TicketPurchase_ID)
+            FROM Ticket_Sale ts WHERE ts.TicketPurchase_ID = @id FOR UPDATE", conn, tx))
+        {
+            cmd.Parameters.AddWithValue("@id", Id);
+            await using var r = await cmd.ExecuteReaderAsync();
+            if (!await r.ReadAsync())
+            {
+                TempData["Success"] = $"Ticket order #{Id} was already voided.";
+                return Redirect("/Tickets/TicketSales");
+            }
+            total = r.GetDecimal(0);
+            tickets = Convert.ToInt32(r.GetValue(1));
+        }
+
+        foreach (var sql in new[] { "DELETE FROM Ticket_Purchase_Item WHERE TicketPurchase_ID = @id",
+                                    "DELETE FROM Ticket_Sale WHERE TicketPurchase_ID = @id" })
+        {
+            await using var cmd = new MySqlCommand(sql, conn, tx);
+            cmd.Parameters.AddWithValue("@id", Id);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        await tx.CommitAsync();
+
+        TempData["Success"] = $"Ticket order #{Id} ({tickets} ticket(s), {total:C}) was voided.";
+        return Redirect("/Tickets/TicketSales");
     }
 
     public record ItemRow(string TicketType, int Quantity, decimal UnitPrice, decimal ListPrice)
