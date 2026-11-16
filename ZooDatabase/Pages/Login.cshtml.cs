@@ -81,6 +81,10 @@ public class LoginModel : PageModel
         if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
             return LocalRedirect(returnUrl);
 
+        // Customers go to the public website, staff go to their dashboard
+        if (role == ZooDatabase.Data.UserEmployees.CustomerRole)
+            return Redirect("/");
+
         return RedirectToPage("/Index");
     }
 }

@@ -26,8 +26,13 @@ public class ManageUsersModel : PageModel
         await conn.OpenAsync();
 
         var sql = @"SELECT u.User_ID, u.Username, u.Role, u.Is_Active, u.Created_At, u.Last_Login,
-                           CONCAT(e.First_Name, ' ', e.Last_Name) AS Employee_Name
-                    FROM User_Account u LEFT JOIN Employee e ON e.Employee_ID = u.Employee_ID";
+                           COALESCE(CONCAT(e.First_Name, ' ', e.Last_Name),
+                                    CONCAT(v.First_Name, ' ', v.Last_Name, ' (volunteer)'),
+                                    CONCAT(c.First_Name, ' ', c.Last_Name, ' (customer)')) AS Employee_Name
+                    FROM User_Account u
+                    LEFT JOIN Employee e ON e.Employee_ID = u.Employee_ID
+                    LEFT JOIN Volunteer v ON v.Volunteer_ID = u.Volunteer_ID
+                    LEFT JOIN Customer c ON c.Customer_ID = u.Customer_ID";
         if (!string.IsNullOrWhiteSpace(Search))
         {
             // Also match the names people see, so "manager" finds SuperUser accounts
@@ -35,6 +40,8 @@ public class ManageUsersModel : PageModel
             var roleList = string.Join(",", roles.Select(r => "'" + r + "'"));
             sql += " WHERE u.Username LIKE @search OR u.Role LIKE @search"
                    + " OR CONCAT(e.First_Name, ' ', e.Last_Name) LIKE @search"
+                   + " OR CONCAT(v.First_Name, ' ', v.Last_Name) LIKE @search"
+                   + " OR CONCAT(c.First_Name, ' ', c.Last_Name) LIKE @search"
                    + (roles.Length > 0 ? " OR u.Role IN (" + roleList + ")" : "");
         }
         sql += " ORDER BY u.User_ID";

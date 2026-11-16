@@ -72,6 +72,13 @@ app.Use(async (context, next) =>
         context.Response.Redirect("/Guide");
         return;
     }
+    // Customers can only open the public site and their own account, see Data/CustomerOptions.cs
+    if (ZooDatabase.Data.CustomerOptions.IsCustomer(context.User)
+        && !ZooDatabase.Data.CustomerOptions.CustomerCanOpen(context.Request.Path))
+    {
+        context.Response.Redirect("/");
+        return;
+    }
     await next();
 });
 

@@ -14,7 +14,9 @@ public static class RoleNames
         ("Veterinarian", "Veterinarian"),
         ("Cashier", "Cashier"),
         ("TourGuide", "Tour Guide"),
-        ("ReadOnly", "Volunteer")
+        ("ReadOnly", "Volunteer"),
+        // Zoo visitors: linked to a Customer row, and only allowed on the public website
+        ("Customer", "Customer")
     };
 
     // The saved names only, used to check a chosen role is valid

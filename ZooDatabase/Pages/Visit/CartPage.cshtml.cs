@@ -63,6 +63,34 @@ public class CartPageModel : PageModel
         await BuildLinesAsync(conn, null, cart);
         Step = step == "checkout" && Lines.Count > 0 ? "checkout" : "cart";
         if (DateTime.TryParse(cart.VisitDate, out var visit) && visit.Date >= DateTime.Today) VisitDate = visit.Date;
+
+        // A signed-in customer gets their details filled in from their Customer record
+        if (Step == "checkout" && await LinkedCustomerIdAsync(conn, null) is int linkedId)
+        {
+            await using var cmd = new MySqlCommand(
+                "SELECT First_Name, Last_Name, Email, Phone_Number FROM Customer WHERE Customer_ID = @c", conn);
+            cmd.Parameters.AddWithValue("@c", linkedId);
+            await using var r = await cmd.ExecuteReaderAsync();
+            if (await r.ReadAsync())
+            {
+                FirstName = r.GetString(0);
+                LastName = r.GetString(1);
+                Email = r.IsDBNull(2) ? null : r.GetString(2);
+                Phone = r.IsDBNull(3) ? null : r.GetString(3);
+            }
+        }
+    }
+
+    // Unified users: the Customer_ID linked to the signed-in Customer login, or null for guests and staff
+    private async Task<int?> LinkedCustomerIdAsync(MySqlConnection conn, MySqlTransaction? tx)
+    {
+        if (!CustomerOptions.IsCustomer(User)) return null;
+        if (!int.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var userId)) return null;
+        await using var cmd = new MySqlCommand(
+            "SELECT Customer_ID FROM User_Account WHERE User_ID = @u AND Is_Active = TRUE", conn, tx);
+        cmd.Parameters.AddWithValue("@u", userId);
+        var found = await cmd.ExecuteScalarAsync();
+        return found == null || found == DBNull.Value ? null : Convert.ToInt32(found);
     }
 
     public IActionResult OnPostUpdate()
@@ -228,6 +256,9 @@ public class CartPageModel : PageModel
 
     private async Task<int> FindOrCreateCustomerAsync(MySqlConnection conn, MySqlTransaction tx)
     {
+        // A signed-in customer always orders as their own linked Customer record
+        if (await LinkedCustomerIdAsync(conn, tx) is int linkedId) return linkedId;
+
         await using (var find = new MySqlCommand(
             "SELECT Customer_ID FROM Customer WHERE LOWER(Email) = @e ORDER BY Customer_ID LIMIT 1", conn, tx))
         {

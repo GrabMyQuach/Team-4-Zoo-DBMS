@@ -4,6 +4,8 @@
     // so the menu sits on top of the photo in white.
     bool hero = ViewData["Hero"] as bool? == true;
     bool loggedIn = User.Identity?.IsAuthenticated == true;
+    // Customers sign in through the same login as staff (unified users) but have no dashboard
+    bool customer = CustomerOptions.IsCustomer(User);
     int cartCount = Cart.Load(Context.Session).ItemCount;
 }
 <!DOCTYPE html>
@@ -26,7 +28,11 @@
                 <a href="/visit/tickets">Tickets</a>
                 <a href="/visit/membership">Membership</a>
                 <a href="/visit/cart">Cart (@cartCount)</a>
-                @if (loggedIn)
+                @if (customer)
+                {
+                    <a class="pub-pill" href="/MyAccount">My account</a>
+                }
+                else if (loggedIn)
                 {
                     <a class="pub-pill" href="/Dashboard">Staff dashboard</a>
                 }
@@ -63,7 +69,10 @@
                 <a href="/visit/tickets">Tickets</a>
                 <a href="/visit/membership">Membership</a>
                 <a href="/visit/shop">Shop Online</a>
-                <a href="@(loggedIn ? "/Dashboard" : "/Login")">Staff login</a>
+                @if (!customer)
+                {
+                    <a href="@(loggedIn ? "/Dashboard" : "/Login")">Staff login</a>
+                }
             </nav>
         </div>
         <div class="pub-wrap pub-footer-note">&copy; 2026 @PublicSite.ZooName · COSC 3380 Team 4 project</div>

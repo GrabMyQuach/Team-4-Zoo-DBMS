@@ -51,6 +51,7 @@ public static class ZooModules
     // Which sections a user can open (used by the home page cards and the main menu)
     public static bool CanSee(System.Security.Claims.ClaimsPrincipal user, string moduleKey)
     {
+        if (user.IsInRole("Customer")) return false;
         if (user.IsInRole("ReadOnly") && (moduleKey == "Staff" || moduleKey == "Finance")) return false;
         if ((user.IsInRole("Zookeeper") || user.IsInRole("Veterinarian")) && moduleKey != "Animals") return false;
         if (user.IsInRole("Cashier") && moduleKey != "Tickets") return false;

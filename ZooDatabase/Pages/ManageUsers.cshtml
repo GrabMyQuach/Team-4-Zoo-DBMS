@@ -33,7 +33,7 @@
                     <th>ID</th>
                     <th>Username</th>
                     <th>Role</th>
-                    <th>Employee</th>
+                    <th>Linked to</th>
                     <th>Status</th>
                     <th>Created</th>
                     <th>Last Login</th>
@@ -55,6 +55,10 @@
                             else if (ZooDatabase.Data.UserEmployees.NeedsLink.Contains(u.Role))
                             {
                                 <span class="badge bg-warning text-dark" title="Their workspace stays empty until this account is linked to an employee">Needs link</span>
+                            }
+                            else if (u.Role == ZooDatabase.Data.UserEmployees.CustomerRole)
+                            {
+                                <span class="badge bg-warning text-dark" title="Customer accounts need to be linked to the customer who uses them">Needs link</span>
                             }
                             else
                             {

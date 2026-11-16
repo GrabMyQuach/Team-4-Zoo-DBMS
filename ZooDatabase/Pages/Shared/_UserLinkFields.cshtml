@@ -1,0 +1,81 @@
+@model ZooDatabase.Data.UserEmployees.LinkFields
+@*
+    The "who uses this login" dropdowns on Add User and Edit User (unified users).
+    Only the dropdown that fits the chosen role is shown; the server keeps only that one too.
+*@
+
+<div class="mb-3" data-link="employee">
+    <label class="form-label fw-semibold" for="EmployeeId">Employee</label>
+    <select id="EmployeeId" name="EmployeeId" class="form-select">
+        <option value="">Not linked to an employee</option>
+        @foreach (var e in Model.Employees)
+        {
+            if (e.LinkedTo != null && e.Id != Model.EmployeeId)
+            {
+                <option value="@e.Id" disabled>@e.Name (already linked to @e.LinkedTo)</option>
+            }
+            else
+            {
+                <option value="@e.Id" selected="@(e.Id == Model.EmployeeId)">@e.Name@(e.Job != null ? " · " + e.Job : "")</option>
+            }
+        }
+    </select>
+    <div class="form-text">Required for Zookeeper, Veterinarian, Cashier and Tour Guide accounts, so their pages can show their own animals, tasks and sales.</div>
+</div>
+
+<div class="mb-3" data-link="volunteer">
+    <label class="form-label fw-semibold" for="VolunteerId">Volunteer</label>
+    <select id="VolunteerId" name="VolunteerId" class="form-select">
+        <option value="">Not linked to a volunteer</option>
+        @foreach (var v in Model.Volunteers)
+        {
+            if (v.LinkedTo != null && v.Id != Model.VolunteerId)
+            {
+                <option value="@v.Id" disabled>@v.Name (already linked to @v.LinkedTo)</option>
+            }
+            else
+            {
+                <option value="@v.Id" selected="@(v.Id == Model.VolunteerId)">@v.Name@(v.Job != null ? " · " + v.Job : "")</option>
+            }
+        }
+    </select>
+    <div class="form-text">Pick the volunteer who uses this login. Read-only staff can be linked to an employee above instead.</div>
+</div>
+
+<div class="mb-3" data-link="customer">
+    <label class="form-label fw-semibold" for="CustomerId">Customer</label>
+    <select id="CustomerId" name="CustomerId" class="form-select">
+        <option value="">Choose a customer</option>
+        @foreach (var c in Model.Customers)
+        {
+            if (c.LinkedTo != null && c.Id != Model.CustomerId)
+            {
+                <option value="@c.Id" disabled>@c.Name (already linked to @c.LinkedTo)</option>
+            }
+            else
+            {
+                <option value="@c.Id" selected="@(c.Id == Model.CustomerId)">@c.Name@(c.Job != null ? " · " + c.Job : "")</option>
+            }
+        }
+    </select>
+    <div class="form-text">Required for Customer accounts. Customers can only use the public website and their account page.</div>
+</div>
+
+<script>
+    // Show only the dropdown(s) that fit the chosen role
+    (function () {
+        var role = document.getElementById('Role');
+        if (!role) return;
+        function show() {
+            var r = role.value;
+            var visible = r === '@ZooDatabase.Data.UserEmployees.CustomerRole' ? ['customer']
+                        : r === '@ZooDatabase.Data.UserEmployees.VolunteerRole' ? ['volunteer', 'employee']
+                        : ['employee'];
+            document.querySelectorAll('[data-link]').forEach(function (el) {
+                el.hidden = visible.indexOf(el.getAttribute('data-link')) < 0;
+            });
+        }
+        role.addEventListener('change', show);
+        show();
+    })();
+</script>
